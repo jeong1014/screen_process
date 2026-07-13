@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>作業者画面 | CDI</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#ffffff; --line:#d7dde6; --text:#1a2433; --sub:#5c6b80;
+    --start:#0e9f5a; --start-bg:#e2f7ec;
+    --done:#1477d2;  --done-bg:#e3f0fc;
+    --err:#d63b2f;   --err-bg:#fdeae8;
+    --undo:#e07800;  --undo-bg:#fff3e0;
+    --ln:#0fa693; --dp:#e08a00; --sdp:#7c4fd8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--text); user-select:none; overflow:hidden;
+    font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;
+    display:flex; flex-direction:column; max-width:820px; margin:0 auto;
+  }
+
+  /* ===== 右上: テスト/表示工程の操作(実運用では隠せる) ===== */
+  #sideCtrl{
+    position:fixed; top:8px; right:8px; z-index:30;
+    display:flex; flex-direction:column; gap:6px;
+    background:rgba(255,255,255,.92); border:2px solid var(--line);
+    border-radius:12px; padding:8px 10px; box-shadow:0 2px 8px rgba(0,0,0,.08);
+  }
+  #sideCtrl .lbl{font-size:12px; font-weight:800; color:var(--sub); text-align:center; letter-spacing:1px;}
+  #sideCtrl button, #sideCtrl select{
+    font-size:15px; font-weight:800; padding:7px 10px; border-radius:8px;
+    border:2px solid var(--line); background:#fff; color:var(--sub); cursor:pointer;
+  }
+  #sideCtrl #scanBtn{border-color:var(--start); background:var(--start-bg); color:var(--start);}
+  #sideCtrl #scanBtn:active{background:var(--start); color:#fff;}
+
+  /* ===== 上段: 製品番号 + 工程ステップ + 段階表示 ===== */
+  #top{
+    background:var(--card); border-bottom:5px solid var(--line);
+    padding:26px 20px; text-align:center;
+  }
+  #topOrder{display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap;}
+  .fb{font-size:38px; font-weight:900; padding:4px 22px; border-radius:14px; color:#fff;}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);}
+  #ono{font-size:52px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:1px;}
+
+  /* ---- 工程ステップバー(工程別) ---- */
+  #steps{display:flex; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap;}
+  .step{
+    font-size:24px; font-weight:800; padding:10px 18px; border-radius:12px;
+    background:#eceff3; color:var(--sub); border:3px solid var(--line);
+  }
+  .step.active{background:var(--start-bg); color:var(--start); border-color:var(--start);}
+  .step.done2{background:var(--done-bg); color:var(--done); border-color:var(--done);}
+
+  #stage{
+    margin-top:18px; padding:22px 10px; border-radius:20px;
+    font-size:72px; font-weight:900; letter-spacing:6px; line-height:1.1;
+    background:#eceff3; color:var(--sub);
+  }
+  #stage.start{background:var(--start-bg); color:var(--start);}
+  #stage.done{background:var(--done-bg); color:var(--done);}
+  #stage.error{background:var(--err-bg); color:var(--err); font-size:48px; letter-spacing:2px;}
+  #stage.undo{background:var(--undo-bg); color:var(--undo);}
+  #stageSub{margin-top:12px; font-size:26px; font-weight:800; color:var(--sub);}
+
+  /* ===== 中段: その工程に必要な情報のみ ===== */
+  #info{flex:1; padding:20px; overflow:auto;}
+  .irow{
+    display:flex; align-items:center; gap:16px;
+    background:var(--card); border:3px solid var(--line); border-radius:18px;
+    padding:20px 24px; margin-bottom:12px;
+  }
+  .irow .k{font-size:30px; font-weight:800; color:var(--sub); width:38%;}
+  .irow .v{font-size:42px; font-weight:900;}
+  .irow .v.none{color:#9aa8bb;}
+  .empty{text-align:center; color:#9aa8bb; font-size:30px; font-weight:800; padding:70px 20px; line-height:1.5;}
+
+  /* ===== 下段: メインは「戻る」ボタン ===== */
+  #bottom{display:flex; padding:16px 20px 24px;}
+  #backBtn{
+    flex:1; padding:34px 10px; font-size:46px; font-weight:900; letter-spacing:4px;
+    border-radius:20px; cursor:pointer;
+    border:5px solid var(--undo); background:var(--undo-bg); color:var(--undo);
+  }
+  #backBtn:active{background:var(--undo); color:#fff;}
+  #backBtn:disabled{opacity:.25;}
+</style>
+</head>
+<body>
+
+<!-- テスト操作 + 表示工程の選択(実運用の各端末では非表示にできる) -->
+<div id="sideCtrl">
+  <div class="lbl">テスト</div>
+  <button id="scanBtn">スキャン</button>
+  <div class="lbl">表示工程</div>
+  <select id="viewSel">
+    <option value="all">全工程</option>
+    <option value="0">裁断</option>
+    <option value="1">ミシン</option>
+    <option value="2">ハトメ</option>
+    <option value="3">梱包</option>
+  </select>
+</div>
+
+<div id="top">
+  <div id="topOrder"><span id="ono">製品番号 —</span></div>
+  <div id="steps">
+    <div class="step">裁断</div><div class="step">ミシン</div><div class="step">ハトメ</div><div class="step">梱包</div>
+  </div>
+  <div id="stage">スキャン待機中</div>
+  <div id="stageSub">ラベルのバーコードをスキャンしてください</div>
+</div>
+
+<div id="info"><div class="empty">スキャンすると、その工程に必要な情報だけが表示されます</div></div>
+
+<div id="bottom">
+  <button id="backBtn" disabled>戻　る</button>
+</div>
+
+<script>
+/* =====================================================================
+   ★ 工程別ワンスキャン方式(工程ごとに 開始→完了 の2スキャン)
+   ・工程は 裁断 → ミシン → ハトメ → 梱包 の4つ
+   ・各工程で表示する情報が異なる:
+       裁断 : サイズ / 生地の種類
+       ミシン: マジックテープ / スカートの有無
+       ハトメ: 上面/下面/左面/右面 それぞれの間隔(面ごとに異なる)
+       梱包 : 追加情報なし(スキャンで送り状発行)
+   ・「戻る」= データは消さず、1つ前の工程(段階)に戻るだけ。何度でも可
+   ・右上「スキャン」= テスト用。実スキャナはキーボード入力+Enterで自動捕捉
+   ・右上「表示工程」= この端末で表示する工程を固定できる
+       → 端末を工程別に分ける運用(1番=裁断だけ 等)に対応
+   ・FastAPI接続時 USE_MOCK=false
+     GET  /api/orders/{order_no}   → {..., stage: 0〜8}
+     POST /api/scan {order_no}     → stage+1
+     POST /api/scan/undo {order_no}→ stage-1
+   ===================================================================== */
+const API_BASE = ""; // 같은 서버에서 서빙 → 동일 오리진
+const USE_MOCK = false; // 실제 백엔드 연결
+
+const PROC = [
+  {key:"cutting", name:"裁断"},
+  {key:"sewing",  name:"ミシン"},
+  {key:"eyelet",  name:"ハトメ"},
+  {key:"packing", name:"梱包"},
+];
+/* stage: 0=受付, 1=裁断中,2=裁断完了, 3=ミシン中,4=ミシン完了,
+          5=ハトメ中,6=ハトメ完了, 7=梱包中,8=梱包完了 */
+const MAX_STAGE = 8;
+
+/* ---- 工程別フィールド定義 ---- */
+const FIELDS = {
+  cutting: [["サイズ","size"],["生地の種類","fabric"]],
+  sewing:  [["マジックテープ","magictape"],["スカート","skirt"]],
+  /* ハトメは面ごとに間隔が違う → 4面それぞれ表示 */
+  eyelet:  [["上面","e_top"],["下面","e_bottom"],["左面","e_left"],["右面","e_right"]],
+  packing: [],   /* 梱包は追加情報なし */
+};
+
+/* 「なし」扱いにする値(薄く表示) */
+const NONE_VALS = ["なし","無し","無","-","—",""];
+
+const MOCK_ORDERS = {
+  "WO-TEST-002": {order_no:"WO-TEST-002", fabric:"SDP",
+    size:"W5000×H4000", magictape:"上下 両面", skirt:"有り",
+    e_top:"P300", e_bottom:"P250", e_left:"P200", e_right:"P200", stage:0},
+  "WO-20260702-003": {order_no:"WO-20260702-003", fabric:"DP",
+    size:"W2800×H3000", magictape:"上のみ", skirt:"無し",
+    e_top:"P300", e_bottom:"なし", e_left:"なし", e_right:"なし", stage:0},
+};
+
+let current = null;      // 最後にスキャンした注文
+let viewMode = "all";    // "all" または 工程index 0〜3(端末を工程固定するとき)
+
+/* ---- スキャナ入力: 画面全体でキー捕捉 ---- */
+let buf = "";
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ if(buf.trim()) handleScan(buf.trim()); buf=""; return; }
+  if(e.key.length===1) buf += e.key;
+});
+
+/* ---- スキャン = 1段階進む ---- */
+async function handleScan(code){
+  const order = await fetchOrder(code);
+  if(!order){ setStage("error","注文が見つかりません", code); return; }
+  current = order;
+
+  if(order.stage >= MAX_STAGE){
+    render(order);
+    setStage("error","全工程 完了済み","この注文は梱包まで完了しています");
+    updateBackBtn();
+    return;
+  }
+
+  await advance(order, +1);
+  render(order);
+  showStageBanner(order, false);
+  updateBackBtn();
+}
+
+/* ---- 戻る = データを消さず、1つ前の工程(段階)へ ---- */
+document.getElementById("backBtn").onclick = async ()=>{
+  if(!current || current.stage <= 0) return;
+  await advance(current, -1);
+  render(current);
+  showStageBanner(current, true);
+  updateBackBtn();
+};
+
+/* ---- テストスキャン ---- */
+document.getElementById("scanBtn").onclick = ()=>{
+  handleScan(current ? current.order_no : "WO-TEST-002");
+};
+
+/* ---- 表示工程の選択(端末を工程別に固定) ---- */
+document.getElementById("viewSel").onchange = (e)=>{
+  viewMode = (e.target.value === "all") ? "all" : parseInt(e.target.value,10);
+  if(current){ render(current); showStageBanner(current, false); }
+  else { showIdle(); }
+};
+
+function updateBackBtn(){
+  document.getElementById("backBtn").disabled = !current || current.stage <= 0;
+}
+
+/* ---- API層 ---- */
+async function fetchOrder(no){
+  if(USE_MOCK) return MOCK_ORDERS[no] || null;
+  const r = await fetch(API_BASE+"/api/orders/"+encodeURIComponent(no));
+  return r.ok ? r.json() : null;
+}
+async function advance(order, d){
+  if(USE_MOCK){ order.stage = Math.min(MAX_STAGE, Math.max(0, order.stage+d)); return; }
+  const url = API_BASE + (d>0 ? "/api/scan" : "/api/scan/undo");
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({order_no:order.order_no})});
+  Object.assign(order, await r.json());
+}
+
+/* ---- 工程index(全工程モードの表示対象) ---- */
+function procFromStage(stage){
+  let p = (stage % 2 === 1) ? Math.floor((stage-1)/2) : Math.min(3, stage/2);
+  if(stage >= MAX_STAGE) p = 3;
+  return p;
+}
+function displayIdx(o){ return (viewMode === "all") ? procFromStage(o.stage) : viewMode; }
+
+/* ---- 段階バナー ---- */
+function setStage(cls, big, sub){
+  const s = document.getElementById("stage");
+  s.className = cls; s.textContent = big;
+  document.getElementById("stageSub").textContent = sub || "";
+}
+function showStageBanner(o, isBack){
+  if(viewMode === "all"){
+    if(o.stage === 0){ setStage("undo","受付に戻りました","次の工程: 裁断"); return; }
+    const p = PROC[Math.floor((o.stage-1)/2)];
+    if(o.stage % 2 === 1){
+      setStage("start", p.name+" 開始",
+        isBack ? p.name+"工程に戻りました" : "完了したら もう一度スキャン");
+    }else{
+      const nx = PROC[o.stage/2];
+      setStage("done", p.name+" 完了",
+        o.stage===MAX_STAGE ? "送り状を自動発行します" : "次の工程: "+nx.name);
+    }
+    return;
+  }
+  /* 工程固定モード: その工程の状態だけを表示 */
+  const p = PROC[viewMode];
+  const startStage = viewMode*2 + 1, doneStage = viewMode*2 + 2;
+  if(o.stage >= doneStage){
+    setStage("done", p.name+" 完了", "この工程は完了しています");
+  }else if(o.stage === startStage){
+    setStage("start", p.name+" 作業中", "完了したら もう一度スキャン");
+  }else{
+    setStage("undo", p.name+" 待機中", "前工程の完了を待っています");
+  }
+}
+
+/* ---- 工程ステップバー ---- */
+function renderSteps(o){
+  const cur = displayIdx(o);
+  const completed = Math.floor(o.stage/2);   /* 完了済み工程数 */
+  document.getElementById("steps").innerHTML = PROC.map((p,i)=>{
+    let cls = "step";
+    if(i < completed) cls += " done2";
+    else if(i === cur && o.stage>0) cls += " active";
+    return '<div class="'+cls+'">'+p.name+'</div>';
+  }).join("");
+}
+
+/* ---- 情報テーブル描画 ---- */
+function renderFields(idx, o){
+  const fields = FIELDS[PROC[idx].key];
+  if(!fields.length){
+    document.getElementById("info").innerHTML =
+      '<div class="empty">梱包工程<br>追加の作業情報はありません<br>スキャンで送り状を発行します</div>';
+    return;
+  }
+  document.getElementById("info").innerHTML = fields.map(([k,f])=>{
+    const raw = (o && o[f] != null) ? String(o[f]) : "—";
+    const isNone = NONE_VALS.includes(raw.trim());
+    const val = isNone ? "なし" : raw;
+    return '<div class="irow"><span class="k">'+k+'</span>'+
+           '<span class="v'+(isNone?' none':'')+'">'+val+'</span></div>';
+  }).join("");
+}
+
+/* ---- 全体描画 ---- */
+function render(o){
+  document.getElementById("topOrder").innerHTML =
+    '<span class="fb '+o.fabric+'">'+o.fabric+'</span><span id="ono">'+o.order_no+'</span>';
+  renderSteps(o);
+  renderFields(displayIdx(o), o);
+}
+
+/* ---- 注文未スキャン時の待機表示 ---- */
+function showIdle(){
+  if(viewMode === "all"){
+    document.getElementById("info").innerHTML =
+      '<div class="empty">スキャンすると、その工程に必要な情報だけが表示されます</div>';
+    setStage("", "スキャン待機中", "ラベルのバーコードをスキャンしてください");
+  }else{
+    const p = PROC[viewMode];
+    setStage("", p.name+" 専用端末", "この端末は「"+p.name+"」の情報だけ表示します");
+    renderFields(viewMode, null);
+  }
+  document.getElementById("steps").querySelectorAll(".step").forEach((el,i)=>{
+    el.className = "step" + ((viewMode!=="all" && i===viewMode) ? " active" : "");
+  });
+}
+</script>
+</body>
+</html>

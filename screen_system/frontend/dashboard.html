@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業現況板 | CDI</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#ffffff; --line:#d7dde6; --text:#1a2433; --sub:#5c6b80;
+    --working:#e07800; --working-bg:#fff3e0;
+    --wait:#5c6b80;    --wait-bg:#eceff3;
+    --done:#1477d2;    --done-bg:#e3f0fc;
+    --ship:#0e9f5a;    --ship-bg:#e2f7ec;
+    --ln:#0fa693; --dp:#e08a00; --sdp:#7c4fd8;
+    --acc:#5c6b80;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--text); overflow:hidden;
+    font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;
+    display:flex; flex-direction:column;
+  }
+
+  /* ===== ヘッダー ===== */
+  header{
+    display:flex; align-items:center; gap:28px; padding:18px 30px 12px;
+  }
+  header h1{margin:0; font-size:34px; font-weight:900; letter-spacing:2px;}
+  header .date{font-size:28px; font-weight:800; color:var(--sub);}
+  .legend{display:flex; gap:14px; margin-left:auto;}
+  .legend span{
+    font-size:22px; font-weight:900; padding:6px 20px; border-radius:10px;
+  }
+  .lg-working{background:var(--working-bg); color:var(--working);}
+  .lg-wait{background:var(--wait-bg); color:var(--wait);}
+  .lg-ship{background:var(--ship-bg); color:var(--ship);}
+
+  /* ===== レイアウト ===== */
+  .wrap{flex:1; display:flex; gap:18px; padding:6px 30px 24px; min-height:0;}
+  .orders{flex:3; display:flex; flex-direction:column; gap:16px; min-width:0; overflow:hidden;}
+
+  /* ===== 注文行(スケッチ準拠) ===== */
+  .orow{
+    background:var(--card); border:3px solid var(--line); border-radius:20px;
+    padding:16px 22px; display:flex; flex-direction:column; gap:12px;
+    box-shadow:0 2px 6px rgba(20,40,70,.06);
+  }
+  .orow.working{border-color:var(--working);}
+  .orow.ship{border-color:var(--ship);}
+
+  .r1{display:flex; align-items:center; gap:18px;}
+  .seq{
+    font-size:44px; font-weight:900; font-variant-numeric:tabular-nums;
+    background:var(--text); color:#fff; border-radius:14px;
+    min-width:74px; text-align:center; padding:2px 0; line-height:1.25;
+  }
+  .fb{font-size:34px; font-weight:900; padding:4px 22px; border-radius:12px; color:#fff;}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);}
+  .ono{font-size:44px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:1px;}
+  .otime{margin-left:auto; font-size:26px; font-weight:800; color:var(--sub);}
+  .otime b{font-size:32px; color:var(--text); font-variant-numeric:tabular-nums;}
+
+  .r2{display:flex; gap:18px; align-items:stretch;}
+  .ostatus{
+    flex:1.1; display:flex; align-items:center; justify-content:center;
+    font-size:42px; font-weight:900; letter-spacing:3px;
+    border-radius:14px; padding:14px 10px; white-space:nowrap;
+  }
+  .ostatus.working{background:var(--working-bg); color:var(--working); animation:pulse 1.4s infinite;}
+  .ostatus.wait{background:var(--wait-bg); color:var(--wait);}
+  .ostatus.done{background:var(--done-bg); color:var(--done);}
+  .ostatus.ship{background:var(--ship-bg); color:var(--ship);}
+  @keyframes pulse{50%{opacity:.55;}}
+
+  .oinfo{
+    flex:2; background:#f7f9fc; border:2px solid var(--line); border-radius:14px;
+    padding:10px 20px; display:flex; flex-direction:column; justify-content:center; gap:4px;
+  }
+  .oinfo .size{font-size:36px; font-weight:900;}
+  .oinfo .size small{font-size:26px; font-weight:800; color:var(--sub); margin-left:16px;}
+  .oinfo .opts{font-size:25px; font-weight:800; color:var(--sub); letter-spacing:.5px;}
+  .oinfo .opts b{color:var(--text);}
+
+  .more{
+    text-align:center; font-size:24px; font-weight:900; color:var(--sub); padding:4px;
+  }
+
+  /* ===== 右パネル ===== */
+  .side{flex:1; display:flex; flex-direction:column; gap:16px; min-width:330px; max-width:420px;}
+  .panel{background:var(--card); border:3px solid var(--line); border-radius:20px; padding:16px 20px;}
+  .panel h2{margin:0 0 12px; font-size:22px; font-weight:900; letter-spacing:3px; color:var(--sub);}
+
+  #clock{
+    font-size:78px; font-weight:900; text-align:center; letter-spacing:2px;
+    font-variant-numeric:tabular-nums; line-height:1.1; padding:6px 0;
+  }
+
+  .stats{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .stat{background:#f7f9fc; border-radius:14px; padding:12px 6px; text-align:center;}
+  .stat .v{font-size:52px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;}
+  .stat .k{font-size:19px; font-weight:900; color:var(--sub); margin-top:6px;}
+  .stat.working .v{color:var(--working);} .stat.ship .v{color:var(--ship);}
+
+  /* ===== 左: 在庫 ===== */
+  .invcol{flex:0 0 300px; display:flex; flex-direction:column; gap:16px;}
+  .inv-item{padding:14px 0 18px; border-bottom:3px solid var(--line);}
+  .inv-item:last-child{border-bottom:none; padding-bottom:0;}
+  .inv-top{display:flex; align-items:baseline; gap:10px; margin-bottom:10px;}
+  .inv-top .fb{font-size:26px; padding:2px 16px;}
+  .inv-top .fb.ACC{background:var(--acc);}
+  .inv-top .num{margin-left:auto; font-size:40px; font-weight:900; font-variant-numeric:tabular-nums;}
+  .inv-top .num small{font-size:22px; font-weight:800; color:var(--sub);}
+  .inv-bar{height:22px; background:#e8ecf2; border-radius:99px; overflow:hidden;}
+  .inv-bar i{display:block; height:100%; border-radius:99px; background:var(--ship);}
+  .inv-bar i.low{background:var(--err, #d63b2f);}
+  .inv-low{margin-top:8px; font-size:22px; font-weight:900; color:#d63b2f;}
+
+  .histp{flex:1; overflow:hidden;}
+  .hrow{
+    display:flex; gap:12px; align-items:center; padding:11px 2px;
+    border-bottom:2px solid var(--line); font-size:22px; font-weight:800;
+  }
+  .hrow .t{color:var(--sub); font-variant-numeric:tabular-nums;}
+  .hrow .no{font-variant-numeric:tabular-nums;}
+  .hrow .ev{margin-left:auto; font-weight:900;}
+  .ev.start{color:var(--working);} .ev.done{color:var(--done);} .ev.ship{color:var(--ship);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>作業現況板</h1>
+  <span class="date" id="date"></span>
+  <div class="legend">
+    <span class="lg-working">作業中</span>
+    <span class="lg-wait">待機</span>
+    <span class="lg-ship">出荷準備完了</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="invcol">
+    <div class="panel" style="flex:1;">
+      <h2>生地在庫</h2>
+      <div id="inv"></div>
+    </div>
+    <div class="panel" style="flex:1;">
+      <h2>付属品在庫</h2>
+      <div id="inv2"></div>
+    </div>
+  </div>
+
+  <div class="orders" id="orders"></div>
+
+  <div class="side">
+    <div class="panel"><div id="clock">--:--</div></div>
+    <div class="panel">
+      <h2>本日の実績</h2>
+      <div class="stats">
+        <div class="stat"><div class="v" id="stNew">0</div><div class="k">受注</div></div>
+        <div class="stat working"><div class="v" id="stWork">0</div><div class="k">作業中</div></div>
+        <div class="stat ship"><div class="v" id="stShip">0</div><div class="k">出荷準備完了</div></div>
+        <div class="stat"><div class="v" id="stSlip">0</div><div class="k">送り状発行</div></div>
+      </div>
+    </div>
+    <div class="panel histp">
+      <h2>注文・工程履歴</h2>
+      <div id="hist"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   ★ API連携設定 — FastAPI接続時に USE_MOCK=false
+   GET /api/board       → 注文一覧 [{order_no, fabric, size, qty, opts, received_at, status:{...}}]
+   GET /api/events      → 直近イベント
+   GET /api/inventory   → 生地在庫 [{fabric, remain, cap}] ※ロール単位
+   GET /api/accessories → 付属品在庫 [{name, remain, cap, unit}]
+   ===================================================================== */
+const API_BASE = ""; // 같은 서버에서 서빙 → 동일 오리진
+const USE_MOCK = false; // 실제 백엔드 연결
+const REFRESH_MS = 10000;
+const MAX_ROWS = 4;                 // 画面に収まる行数(大型モニターに合わせ調整)
+
+const PROC = [
+  {key:"cutting", name:"裁断"},
+  {key:"sewing",  name:"ミシン"},
+  {key:"eyelet",  name:"ハトメ"},
+  {key:"packing", name:"梱包"},
+];
+
+/* ---- モックデータ(注文番号は仮) ---- */
+const MOCK = {
+  orders: [
+    {order_no:"WO-TEST-002", fabric:"SDP", size:"W5000×H4000", qty:"2セット / 合計4枚",
+     opts:{top:"ハトメP300", bottom:"スカート", left:"ハトメP200", right:"なし"},
+     received_at:"08:12",
+     status:{cutting:"working",sewing:"wait",eyelet:"wait",packing:"wait"}},
+    {order_no:"WO-20260702-003", fabric:"DP", size:"W2800×H3000", qty:"1枚",
+     opts:{top:"ハトメP300", bottom:"なし", left:"なし", right:"なし"},
+     received_at:"09:05",
+     status:{cutting:"done",sewing:"working",eyelet:"wait",packing:"wait"}},
+    {order_no:"WO-20260702-004", fabric:"LN", size:"W3000×H2500", qty:"1セット / 合計2枚",
+     opts:{top:"ベルクロ", bottom:"スカート", left:"なし", right:"なし"},
+     received_at:"10:20",
+     status:{cutting:"done",sewing:"done",eyelet:"done",packing:"done"}},
+    {order_no:"WO-20260702-005", fabric:"SDP", size:"W4000×H3000", qty:"1枚",
+     opts:{top:"ハトメP300", bottom:"スカート", left:"なし", right:"なし"},
+     received_at:"11:02",
+     status:{cutting:"wait",sewing:"wait",eyelet:"wait",packing:"wait"}},
+  ],
+  inventory: [
+    {fabric:"LN",  remain:6, cap:10},
+    {fabric:"DP",  remain:2, cap:10},
+    {fabric:"SDP", remain:5, cap:10},
+  ],
+  accessories: [
+    {name:"ハトメ",   remain:8,  cap:20, unit:"箱"},
+    {name:"ウェビング", remain:3,  cap:15, unit:"巻"},
+    {name:"糸",       remain:12, cap:30, unit:"個"},
+    {name:"ベルクロ",  remain:2,  cap:10, unit:"巻"},
+  ],
+  events: [
+    {t:"11:42", order_no:"WO-20260702-004", ev:"ship",  text:"送り状発行"},
+    {t:"11:41", order_no:"WO-20260702-004", ev:"done",  text:"梱包 完了"},
+    {t:"10:55", order_no:"WO-20260702-003", ev:"start", text:"ミシン 開始"},
+    {t:"10:31", order_no:"WO-TEST-002",     ev:"start", text:"裁断 開始"},
+    {t:"09:58", order_no:"WO-20260702-004", ev:"done",  text:"ハトメ 完了"},
+  ],
+};
+
+/* ---- 状態判定: 作業状態の文言と色 ----
+   working中 → 「裁断中」 / 完了直後の待機 → 「裁断完了」 / 未着手 → 「裁断待ち」
+   梱包done → 「出荷準備完了」 */
+function statusOf(o){
+  if(o.status.packing==="done") return {cls:"ship", text:"出荷準備完了"};
+  for(let i=PROC.length-1;i>=0;i--){
+    if(o.status[PROC[i].key]==="working") return {cls:"working", text:PROC[i].name+"中"};
+  }
+  for(let i=PROC.length-1;i>=0;i--){
+    if(o.status[PROC[i].key]==="done") return {cls:"done", text:PROC[i].name+"完了"};
+  }
+  return {cls:"wait", text:"裁断待ち"};
+}
+
+/* ---- 在庫バー描画(生地・付属品共通ロジック) ---- */
+function renderInvList(el, items, opts){
+  el.innerHTML = items.map(v=>{
+    const pct = Math.max(2, Math.round(v.remain/v.cap*100));
+    const low = opts.isLow ? opts.isLow(v, pct) : pct < 25;
+    const badgeClass = opts.badgeClass ? opts.badgeClass(v) : "";
+    const badgeText = opts.badgeText ? opts.badgeText(v) : "";
+    const unit = opts.unit || v.unit || "m";
+    return `<div class="inv-item">
+      <div class="inv-top"><span class="fb ${badgeClass}">${badgeText}</span>
+        <span class="num">${v.remain}<small> ${unit}</small></span></div>
+      <div class="inv-bar"><i class="${low?"low":""}" style="width:${pct}%"></i></div>
+      ${low?'<div class="inv-low">残りわずか — 要発注</div>':""}
+    </div>`;
+  }).join("");
+}
+
+function render(data){
+  /* 受付時間順に並べ、出荷準備完了は後ろへ */
+  const list = [...data.orders].sort((a,b)=>{
+    const sa = a.status.packing==="done", sb = b.status.packing==="done";
+    if(sa!==sb) return sa?1:-1;
+    return a.received_at.localeCompare(b.received_at);
+  });
+
+  const shown = list.slice(0, MAX_ROWS);
+  document.getElementById("orders").innerHTML = shown.map((o,i)=>{
+    const s = statusOf(o);
+    const op = o.opts;
+    return `<div class="orow ${s.cls}">
+      <div class="r1">
+        <span class="seq">${i+1}</span>
+        <span class="fb ${o.fabric}">${o.fabric}</span>
+        <span class="ono">${o.order_no}</span>
+        <span class="otime">受付 <b>${o.received_at}</b></span>
+      </div>
+      <div class="r2">
+        <div class="ostatus ${s.cls}">${s.text}</div>
+        <div class="oinfo">
+          <div class="size">${o.size}<small>${o.qty}</small></div>
+          <div class="opts">上:<b>${op.top}</b>　下:<b>${op.bottom}</b>　左:<b>${op.left}</b>　右:<b>${op.right}</b></div>
+        </div>
+      </div>
+    </div>`;
+  }).join("") + (list.length>MAX_ROWS ? `<div class="more">他 ${list.length-MAX_ROWS} 件</div>` : "");
+
+  /* 在庫: 生地(色バッジ LN/DP/SDP) */
+  renderInvList(document.getElementById("inv"), data.inventory||[], {
+    badgeClass: v => v.fabric,
+    badgeText:  v => v.fabric,
+    unit: "ロール",
+    isLow: v => v.remain <= 3,
+  });
+
+  /* 在庫: 付属品(ハトメ/ウェビング/糸/ベルクロ — バリエーションなし) */
+  renderInvList(document.getElementById("inv2"), data.accessories||[], {
+    badgeClass: () => "ACC",
+    badgeText:  v => v.name,
+  });
+
+  /* 実績 */
+  const ss = data.orders.map(statusOf);
+  document.getElementById("stNew").textContent  = data.orders.length;
+  document.getElementById("stWork").textContent = ss.filter(s=>s.cls==="working").length;
+  document.getElementById("stShip").textContent = ss.filter(s=>s.cls==="ship").length;
+  document.getElementById("stSlip").textContent = data.events.filter(e=>e.ev==="ship").length;
+
+  /* 履歴 */
+  document.getElementById("hist").innerHTML = data.events.map(e=>`
+    <div class="hrow"><span class="t">${e.t}</span>
+      <span class="no">${e.order_no}</span>
+      <span class="ev ${e.ev}">${e.text}</span></div>`).join("");
+}
+
+async function load(){
+  if(USE_MOCK){ render(MOCK); return; }
+  try{
+    const [orders, events, inventory, accessories] = await Promise.all([
+      fetch(`${API_BASE}/api/board`).then(r=>r.json()),
+      fetch(`${API_BASE}/api/events`).then(r=>r.json()),
+      fetch(`${API_BASE}/api/inventory`).then(r=>r.json()),
+      fetch(`${API_BASE}/api/accessories`).then(r=>r.json()),
+    ]);
+    render({orders, events, inventory, accessories});
+  }catch(e){ console.error(e); }
+}
+load(); setInterval(load, REFRESH_MS);
+
+function tick(){
+  const d = new Date();
+  document.getElementById("clock").textContent =
+    String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  document.getElementById("date").textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${"日月火水木金土"[d.getDay()]}）`;
+}
+tick(); setInterval(tick, 1000);
+</script>
+</body>
+</html>

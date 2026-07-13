@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者ページ | CDI</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#fff; --line:#d7dde6; --text:#1a2433; --sub:#5c6b80;
+    --accent:#1477d2; --ok:#0e9f5a; --warn:#e07800; --warn-bg:#fff3e0;
+    --danger:#d63b2f; --danger-bg:#fdeae8;
+    --ln:#0fa693; --dp:#e08a00; --sdp:#7c4fd8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP",sans-serif;}
+  #gate{position:fixed;inset:0;background:#0d1b2a;display:flex;align-items:center;justify-content:center;z-index:100;}
+  #gate .box{background:#fff;border-radius:16px;padding:34px 30px;width:340px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  #gate h2{margin:0 0 6px;font-size:22px;} #gate p{color:var(--sub);font-size:13px;margin:0 0 18px;}
+  #gate input{width:100%;padding:12px;font-size:16px;border:2px solid var(--line);border-radius:10px;text-align:center;}
+  #gate button{width:100%;margin-top:12px;padding:12px;font-size:16px;font-weight:800;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;}
+  #gate .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;font-weight:700;}
+  header{background:#0d1b2a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;}
+  header h1{margin:0;font-size:20px;font-weight:900;letter-spacing:1px;}
+  header .links{margin-left:auto;font-size:13px;} header .links a{color:#9fc3e8;text-decoration:none;margin-left:14px;}
+  .tabs{display:flex;gap:2px;background:#12263a;padding:0 12px;}
+  .tabs button{background:transparent;color:#a9bcd0;border:none;padding:12px 20px;font-size:15px;font-weight:800;cursor:pointer;border-bottom:3px solid transparent;}
+  .tabs button.on{color:#fff;border-bottom-color:var(--accent);}
+  main{padding:22px;max-width:1200px;margin:0 auto;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px;}
+  .panel h2{margin:0 0 14px;font-size:17px;} .panel h3{margin:18px 0 8px;font-size:14px;color:var(--sub);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;} .scroll{overflow:auto;max-height:60vh;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th{color:var(--sub);font-weight:800;font-size:12px;position:sticky;top:0;background:#fff;}
+  tr.click{cursor:pointer;} tr.click:hover{background:#f7f9fc;}
+  .pill{font-size:11px;padding:2px 9px;border-radius:20px;background:#eef2f7;border:1px solid var(--line);font-weight:700;}
+  .fb{font-weight:900;padding:2px 12px;border-radius:8px;color:#fff;font-size:13px;}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);} .fb.ACC{background:var(--sub);}
+  button.b{border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;}
+  .b-pri{background:var(--accent);color:#fff;} .b-ok{background:var(--ok);color:#fff;}
+  .b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn)!important;}
+  .b-danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger)!important;}
+  .b-gray{background:#eef2f7;color:var(--text);border:1px solid var(--line)!important;}
+  input,select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--text);background:#fff;}
+  label.f{font-size:12px;color:var(--sub);display:block;margin:0 0 3px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .muted{color:var(--sub);font-size:13px;} .low-txt{color:var(--danger);font-weight:800;font-size:12px;}
+  .bar{height:16px;background:#e8ecf2;border-radius:99px;overflow:hidden;min-width:120px;flex:1;}
+  .bar>i{display:block;height:100%;background:var(--ok);} .bar>i.low{background:var(--danger);}
+  #modal{position:fixed;inset:0;background:rgba(10,20,35,.55);display:none;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:30px 12px;}
+  #modal .m{background:#fff;border-radius:14px;max-width:860px;width:100%;padding:22px;}
+  .grid2{display:grid;grid-template-columns:150px 1fr;gap:8px 12px;align-items:center;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1b2a;color:#fff;padding:10px 18px;border-radius:10px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .seg button{background:#fff;border:none;padding:8px 16px;font-weight:800;cursor:pointer;color:var(--sub);}
+  .seg button.on{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+
+<div id="gate"><div class="box">
+  <h2>管理者ページ</h2><p>パスワードを入力してください</p>
+  <input id="pw" type="password" placeholder="パスワード" autofocus>
+  <button onclick="doLogin()">ログイン</button>
+  <div class="err" id="loginErr"></div>
+</div></div>
+
+<header>
+  <h1>CDI 管理</h1>
+  <div class="links">
+    <a href="/dashboard" target="_blank">ダッシュボード</a>
+    <a href="/input" target="_blank">注文入力</a>
+    <a href="#" onclick="logout();return false;">ログアウト</a>
+  </div>
+</header>
+<div class="tabs" id="tabs"></div>
+<main id="main"></main>
+
+<div id="modal" onclick="if(event.target.id==='modal')closeModal()"><div class="m" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TABS=[["orders","注文"],["inv","在庫"],["history","履歴"],["db","DB"]];
+let PW=sessionStorage.getItem("adminpw")||"";
+const hdr=()=>({ "X-Admin-Pass":PW, "Content-Type":"application/json" });
+const esc=s=>(s==null?"":String(s)).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+const pwq=()=>"pw="+encodeURIComponent(PW);
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+async function api(path,opt={}){
+  const r=await fetch(path,Object.assign({headers:hdr()},opt));
+  if(r.status===401){ logout(); throw new Error("認証切れ"); }
+  if(!r.ok){ const e=await r.json().catch(()=>({detail:r.status})); throw new Error(e.detail||r.status); }
+  return r.status===204?null:r.json();
+}
+async function doLogin(){
+  const pw=document.getElementById("pw").value;
+  try{
+    const r=await fetch("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})});
+    if(!r.ok){ document.getElementById("loginErr").textContent="パスワードが違います"; return; }
+    PW=pw; sessionStorage.setItem("adminpw",pw); document.getElementById("gate").style.display="none"; boot();
+  }catch(e){ document.getElementById("loginErr").textContent="接続エラー"; }
+}
+function logout(){ sessionStorage.removeItem("adminpw"); PW=""; location.reload(); }
+document.getElementById("pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+function boot(){ document.getElementById("tabs").innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" onclick="go('${k}')">${n}</button>`).join(""); go("orders"); }
+function go(t){ [...document.querySelectorAll(".tabs button")].forEach(b=>b.classList.toggle("on",b.dataset.t===t)); RENDER[t](); }
+if(PW){ document.getElementById("gate").style.display="none"; boot(); }
+function closeModal(){ document.getElementById("modal").style.display="none"; }
+const RENDER={};
+
+function printTable(title, headers, rows){
+  const w=window.open("","_blank");
+  const e2=c=>(c==null?"":String(c)).replace(/[<>&]/g,x=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[x]));
+  w.document.write("<html><head><meta charset='utf-8'><title>"+e2(title)+"</title>"+
+    "<style>body{font-family:sans-serif;padding:18px;color:#111}h1{font-size:17px;margin:0 0 4px}"+
+    ".d{color:#666;font-size:12px;margin-bottom:10px}table{border-collapse:collapse;width:100%;font-size:12px}"+
+    "th,td{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}</style></head><body>"+
+    "<h1>"+e2(title)+"</h1><div class='d'>"+new Date().toLocaleString()+"</div><table><tr>"+
+    headers.map(h=>"<th>"+e2(h)+"</th>").join("")+"</tr>"+
+    rows.map(r=>"<tr>"+r.map(c=>"<td>"+e2(c)+"</td>").join("")+"</tr>").join("")+
+    "</table></body></html>");
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
+}
+
+// ===== 注文 =====
+RENDER.orders=()=>{
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>注文内訳</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div><label class="f">検索(注文番号/顧客)</label><input id="fq" placeholder="ORD-... / 山田"></div>
+      <div><label class="f">チャネル</label><select id="fch"><option value="">全部</option><option>rakuten</option><option>amazon</option><option>yahoo</option><option>base_ec</option></select></div>
+      <div><label class="f">決済</label><select id="fpay"><option value="">全部</option><option>paid</option><option>pending</option><option>unpaid</option></select></div>
+      <div><label class="f">状態</label><select id="fst"><option value="">全部</option><option>confirmed</option><option>production</option><option>shipped</option><option>closed</option><option>cancelled</option></select></div>
+      <div><label class="f">期間</label><input id="fdf" type="date"> ~ <input id="fdt" type="date"></div>
+      <button class="b b-pri" onclick="loadOrders()">検索</button>
+      <button class="b b-ok" onclick="window.open('/api/admin/export/orders.csv?'+pwq(),'_blank')">注文CSV</button>
+    </div><div id="ordBody" class="muted">検索してください</div></div>`;
+  loadOrders();
+};
+async function loadOrders(){
+  const p=new URLSearchParams(); const g=id=>document.getElementById(id).value;
+  if(g("fq"))p.set("q",g("fq")); if(g("fch"))p.set("channel",g("fch"));
+  if(g("fpay"))p.set("payment",g("fpay")); if(g("fst"))p.set("status",g("fst"));
+  if(g("fdf"))p.set("date_from",g("fdf")); if(g("fdt"))p.set("date_to",g("fdt"));
+  try{
+    const d=await api("/api/admin/orders?"+p.toString());
+    document.getElementById("ordBody").innerHTML=d.length?`<div class="scroll"><table>
+      <tr><th>注文番号</th><th>受注日時</th><th>チャネル</th><th>顧客</th><th>決済</th><th>状態</th><th>明細</th><th>進行(最小)</th></tr>
+      ${d.map(o=>`<tr class="click" onclick="orderDetail('${o.order_no}')">
+        <td><b>${esc(o.order_no)}</b></td><td>${esc(o.ordered_at)}</td><td><span class="pill">${esc(o.channel)}</span></td>
+        <td>${esc(o.customer_name)}</td><td>${esc(o.payment_status)}</td><td><span class="pill">${esc(o.order_status)}</span></td>
+        <td>${o.items}</td><td>${esc(o.min_stage_name)}</td></tr>`).join("")}</table></div>`
+      :`<div class="muted">該当なし</div>`;
+  }catch(e){ document.getElementById("ordBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function orderDetail(no){
+  try{
+    const d=await api("/api/admin/orders/"+encodeURIComponent(no)); const o=d.order;
+    const items=d.items.map(it=>`<tr>
+      <td><b>${esc(it.barcode)}</b></td><td><span class="fb ${it.fabric}">${it.fabric}</span></td><td>${esc(it.size)}</td>
+      <td>${esc(it.product_type)}×${it.quantity}</td>
+      <td>上:${esc(it.opts.top)} 下:${esc(it.opts.bottom)} 左:${esc(it.opts.left)} 右:${esc(it.opts.right)}</td>
+      <td><select onchange="fixStage('${it.barcode}',this.value)">${[0,1,2,3,4,5,6,7,8].map(s=>`<option value="${s}" ${s===it.stage?'selected':''}>${s}</option>`).join("")}</select></td>
+      <td><a class="b b-gray" href="/label/${encodeURIComponent(it.barcode)}?print=1" target="_blank" style="text-decoration:none">🖨 ラベル</a></td></tr>`).join("");
+    const scans=d.scans.length?`<div class="scroll" style="max-height:200px"><table><tr><th>時刻</th><th>製品</th><th>工程</th><th>種別</th></tr>${
+      d.scans.map(s=>`<tr><td>${esc(s.t)}</td><td>${esc(s.barcode)}</td><td>${esc(s.stage_name)}</td><td>${esc(s.event)}</td></tr>`).join("")}</table></div>`:`<div class="muted">スキャン履歴なし</div>`;
+    const ships=d.shipments.length?d.shipments.map(s=>`送り状 ${esc(s.tracking_no||'—')} / ${esc(s.shipping_status)} / ${esc(s.bizlogi_status)}`).join("<br>"):`<span class="muted">なし</span>`;
+    document.getElementById("modalBody").innerHTML=`
+      <div style="display:flex;align-items:center"><h2 style="margin:0;flex:1">${esc(o.order_no)}</h2><button class="b b-gray" onclick="closeModal()">閉じる</button></div>
+      <div class="row" style="margin:14px 0">
+        <div><label class="f">注文番号</label><input id="e_orderno" value="${esc(o.order_no)}" style="width:190px;font-weight:800"></div>
+        <div><label class="f">顧客</label><input id="e_name" value="${esc(o.customer_name)}"></div>
+        <div><label class="f">電話</label><input id="e_phone" value="${esc(o.phone||'')}"></div>
+        <div><label class="f">郵便</label><input id="e_postal" value="${esc(o.postal_code||'')}" style="width:90px"></div>
+        <div style="flex:1;min-width:200px"><label class="f">住所</label><input id="e_addr" value="${esc(o.address||'')}" style="width:100%"></div>
+        <div><label class="f">決済</label><select id="e_pay">${['paid','pending','unpaid','refunded'].map(x=>`<option ${x===o.payment_status?'selected':''}>${x}</option>`).join("")}</select></div>
+        <button class="b b-pri" onclick="saveOrder('${o.order_no}')">保存</button>
+        <button class="b b-danger" onclick="cancelOrder('${o.order_no}')">注文取消</button>
+      </div>
+      <h3>明細(工程で補正 / ラベル再印刷)</h3><div class="scroll" style="max-height:260px"><table>
+        <tr><th>バーコード</th><th>生地</th><th>サイズ</th><th>商品</th><th>加工</th><th>工程</th><th></th></tr>${items}</table></div>
+      <h3>スキャン履歴</h3>${scans}<h3>出荷</h3>${ships}`;
+    document.getElementById("modal").style.display="flex";
+  }catch(e){ alert(e.message); }
+}
+async function saveOrder(no){
+  const g=id=>document.getElementById(id).value;
+  try{ const res=await api("/api/admin/orders/"+encodeURIComponent(no),{method:"PATCH",body:JSON.stringify({
+    order_no:g("e_orderno"),customer_name:g("e_name"),phone:g("e_phone"),postal_code:g("e_postal"),address:g("e_addr"),payment_status:g("e_pay")})});
+    toast("保存しました"); loadOrders();
+    if(res&&res.order_no&&res.order_no!==no){ orderDetail(res.order_no); }
+  }catch(e){ alert(e.message); }
+}
+async function cancelOrder(no){
+  if(!confirm(no+" を取消しますか?")) return;
+  try{ await api("/api/admin/orders/"+encodeURIComponent(no)+"/cancel",{method:"POST"}); toast("取消しました"); closeModal(); loadOrders(); }
+  catch(e){ alert(e.message); }
+}
+async function fixStage(bc,stage){
+  try{ await api("/api/admin/items/"+encodeURIComponent(bc)+"/stage",{method:"PATCH",body:JSON.stringify({stage:parseInt(stage,10)})}); toast("工程を補正"); }
+  catch(e){ alert(e.message); }
+}
+
+// ===== 在庫 =====
+RENDER.inv=async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>在庫管理</h2><div id="invBody" class="muted">読み込み中...</div></div>
+    <div class="panel"><h2>付属品の種類を追加</h2>
+      <div class="row">
+        <div><label class="f">名称</label><input id="acName" placeholder="ハトメ 等"></div>
+        <div><label class="f">単位</label><input id="acUnit" value="個" style="width:70px"></div>
+        <div><label class="f">容量</label><input id="acCap" type="number" value="10" style="width:80px"></div>
+        <div><label class="f">発注点</label><input id="acRe" type="number" value="5" style="width:80px"></div>
+        <button class="b b-pri" onclick="addAcc()">追加</button>
+      </div></div>`;
+  loadInv();
+};
+async function loadInv(){
+  try{
+    const d=await api("/api/admin/inventory");
+    const rowHtml=it=>{
+      const pct=Math.max(2,Math.round(it.remain/it.cap*100));
+      const del=it.kind==='accessory'?`<button class="b b-danger" onclick="delAcc(${it.id},'${esc(it.name)}')">削除</button>`:'';
+      return `<tr>
+        <td><span class="fb ${it.kind==='fabric'?it.name:'ACC'}">${esc(it.name)}</span></td>
+        <td style="width:34%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>
+        <td><b>${it.remain}</b> <span class="muted">/ ${it.cap} ${esc(it.unit)}</span> ${it.low?'<span class="low-txt">要発注</span>':''}</td>
+        <td class="muted">発注点 <input type="number" value="${it.reorder}" style="width:56px" onchange="setReorder('${it.kind}','${it.id}',this.value)"></td>
+        <td>
+          <button class="b b-ok" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',1)">＋入庫</button>
+          <button class="b b-warn" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',-1)">−消尽</button>
+          ${del}
+        </td></tr>`;
+    };
+    document.getElementById("invBody").innerHTML=
+      `<h3>生地(ロール)</h3><table>${d.fabric.map(rowHtml).join("")}</table>
+       <h3>付属品</h3><table>${d.accessories.map(rowHtml).join("")||'<tr><td class="muted">なし</td></tr>'}</table>`;
+  }catch(e){ document.getElementById("invBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function adjust(kind,id,name,sign){
+  const q=prompt(name+" の"+(sign>0?"入庫":"消尽")+"数量","1"); if(q===null)return;
+  const n=Math.abs(parseInt(q,10)||0); if(!n)return;
+  const note=prompt("メモ(任意)","")||null;
+  try{ await api("/api/admin/inventory/adjust",{method:"POST",body:JSON.stringify({kind,id,delta:sign*n,reason:sign>0?'in':'out',note})}); toast("反映しました"); loadInv(); }
+  catch(e){ alert(e.message); }
+}
+async function setReorder(kind,id,v){
+  try{ await api("/api/admin/inventory/reorder",{method:"POST",body:JSON.stringify({kind,id,reorder_point:parseInt(v,10)||0})}); toast("発注点を更新"); }
+  catch(e){ alert(e.message); }
+}
+async function addAcc(){
+  const g=id=>document.getElementById(id).value;
+  if(!g("acName")){ alert("名称を入力"); return; }
+  try{ await api("/api/admin/accessories",{method:"POST",body:JSON.stringify({name:g("acName"),unit:g("acUnit")||"個",capacity:parseInt(g("acCap"),10)||10,reorder_point:parseInt(g("acRe"),10)||5})});
+    document.getElementById("acName").value=""; toast("追加しました"); loadInv();
+  }catch(e){ alert(e.message); }
+}
+async function delAcc(id,name){
+  if(!confirm(name+" を削除しますか?(在庫履歴も消えます)")) return;
+  try{ await api("/api/admin/accessories/"+id,{method:"DELETE"}); toast("削除しました"); loadInv(); }
+  catch(e){ alert(e.message); }
+}
+
+// ===== 履歴 =====
+let HMODE="inv";
+let HROWS=[];
+const REASON_JA={in:"入庫",out:"消尽",adjust:"調整"};
+RENDER.history=()=>{
+  document.getElementById("main").innerHTML=`<div class="panel">
+    <div class="row" style="margin-bottom:12px">
+      <div class="seg">
+        <button id="hmInv" class="on" onclick="setHMode('inv')">入出庫履歴</button>
+        <button id="hmScan" onclick="setHMode('scan')">生産スキャン履歴</button>
+      </div>
+    </div>
+    <div id="hFilter"></div>
+    <div id="hBody" class="muted">照会してください</div>
+  </div>`;
+  setHMode("inv");
+};
+function setHMode(m){
+  HMODE=m;
+  document.getElementById("hmInv").classList.toggle("on",m==="inv");
+  document.getElementById("hmScan").classList.toggle("on",m==="scan");
+  const F=document.getElementById("hFilter");
+  if(m==="inv"){
+    F.innerHTML=`<div class="row" style="margin-bottom:12px">
+      <div><label class="f">期間</label><input id="hdf" type="date"> ~ <input id="hdt" type="date"></div>
+      <div><label class="f">対象種別</label><select id="hkind"><option value="">全部</option><option value="fabric">生地</option><option value="accessory">付属品</option></select></div>
+      <div><label class="f">区分</label><select id="hreason"><option value="">全部</option><option value="in">入庫</option><option value="out">消尽</option><option value="adjust">調整</option></select></div>
+      <button class="b b-pri" onclick="loadHistory()">照会</button>
+      <button class="b b-ok" onclick="csvHistory()">CSV</button>
+      <button class="b b-gray" onclick="printHistory()">🖨 印刷</button>
+    </div>`;
+  }else{
+    F.innerHTML=`<div class="row" style="margin-bottom:12px">
+      <div><label class="f">期間</label><input id="hdf" type="date"> ~ <input id="hdt" type="date"></div>
+      <div><label class="f">検索(バーコード/注文番号)</label><input id="hq" placeholder="ORD-..."></div>
+      <div><label class="f">工程</label><select id="hstage"><option value="">全部</option>${[1,2,3,4,5,6,7,8].map(s=>`<option value="${s}">${s}</option>`).join("")}</select></div>
+      <button class="b b-pri" onclick="loadHistory()">照会</button>
+      <button class="b b-ok" onclick="csvHistory()">CSV</button>
+      <button class="b b-gray" onclick="printHistory()">🖨 印刷</button>
+    </div>`;
+  }
+  loadHistory();
+}
+function histParams(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:"";};
+  const p=new URLSearchParams();
+  if(g("hdf"))p.set("date_from",g("hdf")); if(g("hdt"))p.set("date_to",g("hdt"));
+  if(HMODE==="inv"){ if(g("hkind"))p.set("kind",g("hkind")); if(g("hreason"))p.set("reason",g("hreason")); }
+  else { if(g("hq"))p.set("q",g("hq")); if(g("hstage"))p.set("stage",g("hstage")); }
+  return p;
+}
+async function loadHistory(){
+  const p=histParams();
+  try{
+    if(HMODE==="inv"){
+      const d=await api("/api/admin/inventory/history?"+p.toString()); HROWS=d;
+      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件</div><div class="scroll"><table>
+        <tr><th>日時</th><th>対象</th><th>区分</th><th>増減</th><th>残</th><th>メモ</th><th>担当</th></tr>
+        ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.target)}</td><td><span class="pill">${REASON_JA[x.reason]||x.reason}</span></td>
+          <td style="color:${x.delta<0?'var(--danger)':'var(--ok)'}"><b>${x.delta>0?'+':''}${x.delta}</b></td>
+          <td>${x.balance==null?'':x.balance}</td><td class="muted">${esc(x.note||'')}</td><td>${esc(x.worker||'')}</td></tr>`).join("")}</table></div>`
+        :`<div class="muted">履歴なし</div>`;
+    }else{
+      const d=await api("/api/admin/scans?"+p.toString()); HROWS=d;
+      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件</div><div class="scroll"><table>
+        <tr><th>日時</th><th>バーコード</th><th>注文番号</th><th>工程</th><th>種別</th><th>端末</th></tr>
+        ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.barcode)}</td><td>${esc(x.order_no)}</td>
+          <td>${esc(x.stage_name)}</td><td>${esc(x.event)}</td><td>${esc(x.station||'')}</td></tr>`).join("")}</table></div>`
+        :`<div class="muted">履歴なし</div>`;
+    }
+  }catch(e){ document.getElementById("hBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+function csvHistory(){
+  const p=histParams(); p.set("pw",PW);
+  const url=(HMODE==="inv"?"/api/admin/inventory/history.csv?":"/api/admin/scans.csv?")+p.toString();
+  window.open(url,"_blank");
+}
+function printHistory(){
+  if(!HROWS.length){ alert("印刷する行がありません"); return; }
+  if(HMODE==="inv"){
+    printTable("入出庫履歴",["日時","対象","区分","増減","残","メモ","担当"],
+      HROWS.map(x=>[x.t,x.target,REASON_JA[x.reason]||x.reason,(x.delta>0?"+":"")+x.delta,x.balance,x.note||"",x.worker||""]));
+  }else{
+    printTable("生産スキャン履歴",["日時","バーコード","注文番号","工程","種別","端末"],
+      HROWS.map(x=>[x.t,x.barcode,x.order_no,x.stage_name,x.event,x.station||""]));
+  }
+}
+
+// ===== DB ビューア(編集可) =====
+let DB_STATE={table:null,pk:null,columns:[],rows:[]};
+RENDER.db=async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>DB — テーブルを選んで閲覧・編集</h2>
+    <div class="row" style="margin-bottom:10px">
+      <div><label class="f">テーブル</label><select id="dbT" onchange="loadTable(this.value)"><option value="">選択...</option></select></div>
+      <div><label class="f">検索(この画面内)</label><input id="dbQ" placeholder="文字で絞り込み" oninput="filterDb()"></div>
+      <span class="muted" id="dbInfo"></span>
+    </div>
+    <div id="dbBody" class="muted">上でテーブルを選んでください。行をクリックすると編集できます。</div></div>`;
+  try{
+    const ts=await api("/api/admin/db/tables");
+    document.getElementById("dbT").innerHTML=`<option value="">選択...</option>`+ts.map(t=>`<option value="${t.table}">${t.table} (${t.count})</option>`).join("");
+  }catch(e){ document.getElementById("dbBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+async function loadTable(t){
+  if(!t)return;
+  try{
+    const d=await api("/api/admin/db/"+t);
+    DB_STATE={table:d.table,pk:d.pk,columns:d.columns,rows:d.rows};
+    document.getElementById("dbInfo").textContent=`${d.rows.length}行 / 主キー:${d.pk}(編集不可)`;
+    renderDb(d.rows);
+  }catch(e){ document.getElementById("dbBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+function cellText(v){ if(v===null||v===undefined)return ""; if(typeof v==="object")return JSON.stringify(v); return String(v); }
+function renderDb(rows){
+  const c=DB_STATE.columns;
+  document.getElementById("dbBody").innerHTML=rows.length?`<div class="scroll"><table>
+    <tr>${c.map(x=>`<th>${esc(x)}</th>`).join("")}</tr>
+    ${rows.map((r,i)=>`<tr class="click" onclick="editRow(${i})">${c.map(x=>`<td>${esc(cellText(r[x])).slice(0,60)}</td>`).join("")}</tr>`).join("")}</table></div>`
+    :`<div class="muted">行なし</div>`;
+}
+function filterDb(){
+  const q=document.getElementById("dbQ").value.toLowerCase();
+  renderDb(!q?DB_STATE.rows:DB_STATE.rows.filter(r=>DB_STATE.columns.some(c=>cellText(r[c]).toLowerCase().includes(q))));
+}
+function editRow(idx){
+  const shown=document.getElementById("dbQ").value.toLowerCase();
+  const list=shown?DB_STATE.rows.filter(r=>DB_STATE.columns.some(c=>cellText(r[c]).toLowerCase().includes(shown))):DB_STATE.rows;
+  const r=list[idx]; const pk=DB_STATE.pk;
+  const fields=DB_STATE.columns.map(c=>{
+    const val=esc(cellText(r[c])); const ro=(c===pk)?'disabled style="background:#eef2f7"':'';
+    return `<label class="f">${esc(c)}${c===pk?' (主キー)':''}</label><input data-c="${esc(c)}" value="${val}" ${ro}>`;
+  }).join("");
+  document.getElementById("modalBody").innerHTML=`
+    <div style="display:flex;align-items:center"><h2 style="margin:0;flex:1">${esc(DB_STATE.table)} 行編集</h2><button class="b b-gray" onclick="closeModal()">閉じる</button></div>
+    <div class="grid2" style="margin:14px 0">${fields}</div>
+    <div class="row"><button class="b b-pri" onclick="saveRow('${esc(String(r[pk]))}')">保存</button>
+      <span class="muted">主キー以外を編集して保存。空欄=NULL。</span></div>`;
+  document.getElementById("modal").style.display="flex";
+}
+async function saveRow(pkVal){
+  const changes={};
+  document.querySelectorAll("#modalBody input[data-c]").forEach(inp=>{ if(!inp.disabled) changes[inp.dataset.c]=inp.value; });
+  try{ const res=await api("/api/admin/db/"+DB_STATE.table,{method:"PATCH",body:JSON.stringify({pk_value:pkVal,changes})});
+    toast("保存しました("+res.updated+"行)"); closeModal(); loadTable(DB_STATE.table);
+  }catch(e){ alert(e.message); }
+}
+</script>
+</body>
+</html>

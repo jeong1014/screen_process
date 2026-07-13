@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>注文入力 / 주문 입력</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0;
+    --accent:#38bdf8; --ok:#22c55e; --muted:#94a3b8; --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:20px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .nav a{color:var(--accent);margin-right:14px;text-decoration:none;font-size:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+  input,select{width:100%;padding:7px 8px;background:#0b1220;border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:14px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .item{border:1px dashed var(--line);border-radius:8px;padding:12px;margin-bottom:10px;position:relative}
+  .item h3{margin:0 0 6px;font-size:14px;color:var(--accent)}
+  button{cursor:pointer;border:none;border-radius:7px;padding:9px 14px;font-size:14px;font-weight:600}
+  .btn-add{background:#0b1220;color:var(--accent);border:1px solid var(--accent)}
+  .btn-sub{background:var(--accent);color:#00263a;width:100%;padding:13px;font-size:16px}
+  .btn-del{background:transparent;color:var(--danger);position:absolute;top:8px;right:8px;padding:2px 8px}
+  #result{white-space:pre-wrap;font-family:monospace;font-size:13px;color:var(--ok)}
+  .procrow{display:grid;grid-template-columns:70px 1fr 90px;gap:6px;align-items:center;margin-bottom:5px}
+  .procrow span{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <h1>注文入力 <span style="color:var(--muted);font-size:14px">주문 입력</span></h1>
+  <div class="sub">고객 + 명세를 손으로 입력 → 저장하면 DB에 들어가고 작업자화면·대시보드에 반영됩니다.</div>
+  <div class="nav">
+    <a href="/worker" target="_blank">▶ 作業者画面(작업자화면)</a>
+    <a href="/dashboard" target="_blank">▶ ダッシュボード(대시보드)</a>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0">お客様情報 / 고객정보</h3>
+    <div class="grid g3">
+      <div><label>販売チャネル</label>
+        <select id="channel">
+          <option value="rakuten">rakuten</option>
+          <option value="amazon">amazon</option>
+          <option value="yahoo">yahoo</option>
+          <option value="base_ec">base_ec (자사)</option>
+        </select></div>
+      <div><label>お客様名</label><input id="customer_name" placeholder="山田太郎"></div>
+      <div><label>決済状態</label>
+        <select id="payment_status">
+          <option value="paid">paid</option>
+          <option value="pending">pending</option>
+          <option value="unpaid">unpaid</option>
+        </select></div>
+    </div>
+    <div class="grid g3" style="margin-top:6px">
+      <div><label>郵便番号</label><input id="postal_code" placeholder="4910000"></div>
+      <div style="grid-column:span 2"><label>住所</label><input id="address" placeholder="愛知県一宮市..."></div>
+    </div>
+    <div class="grid g2" style="margin-top:6px">
+      <div><label>電話</label><input id="phone" placeholder="090..."></div>
+      <div><label>モール注文番号(任意)</label><input id="mall_order_no" placeholder="RKT-..."></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0">明細 / 명세 <span style="color:var(--muted);font-size:12px">(작업지시서·라벨 1장 단위)</span></h3>
+    <div id="items"></div>
+    <button class="btn-add" onclick="addItem()">＋ 明細追加 / 명세 추가</button>
+  </div>
+
+  <button class="btn-sub" onclick="submitOrder()">💾 注文を保存 / 주문 저장</button>
+  <div class="panel" id="resultPanel" style="display:none"><div id="result"></div></div>
+
+<script>
+  // ===== 設定 =====
+  const API_BASE = "";  // 같은 서버에서 서빙되면 빈 값. 다른 곳이면 "http://localhost:8000"
+  const PROC = ["none","eyelet","skirt","velcro"];  // なし/ハトメ/スカート/ベルクロ
+  const FABRIC = ["LN","DP","SDP"];
+  const PRODUCT = ["single","two_sheet_set","skirt"];
+
+  let itemSeq = 0;
+  function procRow(side, labelJa){
+    return `<div class="procrow">
+      <span>${labelJa}</span>
+      <select data-f="process_${side}">${PROC.map(p=>`<option>${p}</option>`).join("")}</select>
+      <input type="number" data-f="process_${side}_mm" placeholder="mm">
+    </div>`;
+  }
+  function addItem(){
+    itemSeq++;
+    const div=document.createElement("div");
+    div.className="item"; div.dataset.id=itemSeq;
+    div.innerHTML=`
+      <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
+      <h3>明細 #${itemSeq}</h3>
+      <div class="grid g3">
+        <div><label>商品種別</label><select data-f="product_type">${PRODUCT.map(p=>`<option>${p}</option>`).join("")}</select></div>
+        <div><label>原団</label><select data-f="fabric_type">${FABRIC.map(p=>`<option>${p}</option>`).join("")}</select></div>
+        <div><label>数量</label><input type="number" data-f="quantity" value="1"></div>
+      </div>
+      <div class="grid g2" style="margin-top:6px">
+        <div><label>幅 W(mm)</label><input type="number" data-f="width_mm" placeholder="3000"></div>
+        <div><label>高さ H(mm)</label><input type="number" data-f="height_mm" placeholder="2500"></div>
+      </div>
+      <label style="margin-top:8px">加工(種別 + 寸法mm)</label>
+      ${procRow("top","上")}${procRow("bottom","下")}${procRow("left","左")}${procRow("right","右")}
+      <label>防炎認証番号</label><input data-f="fire_cert_no" placeholder="BOEN-2026-...">
+    `;
+    document.getElementById("items").appendChild(div);
+  }
+  addItem();
+
+  function collectItem(el){
+    const o={};
+    el.querySelectorAll("[data-f]").forEach(f=>{
+      let v=f.value;
+      if(f.type==="number") v = v===""?null:Number(v);
+      if(v==="none") v="none";
+      o[f.dataset.f]= v===""?null:v;
+    });
+    return o;
+  }
+  async function submitOrder(){
+    const body={
+      channel:val("channel"), customer_name:val("customer_name"),
+      postal_code:val("postal_code"), address:val("address"), phone:val("phone"),
+      payment_status:val("payment_status"), mall_order_no:val("mall_order_no")||null,
+      items:[...document.querySelectorAll(".item")].map(collectItem),
+    };
+    try{
+      const r=await fetch(API_BASE+"/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const d=await r.json();
+      const p=document.getElementById("resultPanel"); p.style.display="block";
+      if(!r.ok){ document.getElementById("result").style.color="var(--danger)"; document.getElementById("result").textContent="エラー: "+JSON.stringify(d,null,2); return; }
+      document.getElementById("result").style.color="var(--ok)";
+      document.getElementById("result").innerHTML=
+        "✔ 保存完了 / 저장 완료\n注文番号: "+d.order_no+
+        "\n\nラベル(製品番号) — 클릭하면 라벨이 열리고 인쇄창이 뜹니다:\n"+
+        d.barcodes.map(b=>'  <a href=\"/label/'+encodeURIComponent(b)+'?print=1\" target=\"_blank\" style=\"color:var(--accent);font-family:monospace\">🖨 '+b+'</a>').join("\n")+
+        "\n\n→ 作業者画面·ダッシュボードで確認하세요. (스캔은 이 바코드로)";
+    }catch(e){ alert("서버 연결 실패: "+e); }
+  }
+  const val=id=>document.getElementById(id).value;
+</script>
+</body>
+</html>

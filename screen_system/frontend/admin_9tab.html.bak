@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者ページ | CDI</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#fff; --line:#d7dde6; --text:#1a2433; --sub:#5c6b80;
+    --accent:#1477d2; --accent-bg:#e3f0fc; --ok:#0e9f5a; --ok-bg:#e2f7ec;
+    --warn:#e07800; --warn-bg:#fff3e0; --danger:#d63b2f; --danger-bg:#fdeae8;
+    --ln:#0fa693; --dp:#e08a00; --sdp:#7c4fd8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP",sans-serif;}
+  /* 로그인 게이트 */
+  #gate{position:fixed;inset:0;background:#0d1b2a;display:flex;align-items:center;justify-content:center;z-index:100;}
+  #gate .box{background:#fff;border-radius:16px;padding:34px 30px;width:340px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  #gate h2{margin:0 0 6px;font-size:22px;}
+  #gate p{color:var(--sub);font-size:13px;margin:0 0 18px;}
+  #gate input{width:100%;padding:12px;font-size:16px;border:2px solid var(--line);border-radius:10px;text-align:center;}
+  #gate button{width:100%;margin-top:12px;padding:12px;font-size:16px;font-weight:800;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;}
+  #gate .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;font-weight:700;}
+  /* 헤더 + 탭 */
+  header{background:#0d1b2a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;}
+  header h1{margin:0;font-size:20px;font-weight:900;letter-spacing:1px;}
+  header .links{margin-left:auto;font-size:13px;}
+  header .links a{color:#9fc3e8;text-decoration:none;margin-left:14px;}
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;background:#12263a;padding:0 12px;}
+  .tabs button{background:transparent;color:#a9bcd0;border:none;padding:12px 16px;font-size:14px;font-weight:800;cursor:pointer;border-bottom:3px solid transparent;}
+  .tabs button.on{color:#fff;border-bottom-color:var(--accent);}
+  main{padding:22px;max-width:1200px;margin:0 auto;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px;}
+  .panel h2{margin:0 0 14px;font-size:17px;}
+  .panel h3{margin:18px 0 8px;font-size:14px;color:var(--sub);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th{color:var(--sub);font-weight:800;font-size:12px;}
+  tr.click{cursor:pointer;} tr.click:hover{background:#f7f9fc;}
+  .pill{font-size:11px;padding:2px 9px;border-radius:20px;background:#eef2f7;border:1px solid var(--line);font-weight:700;}
+  .fb{font-weight:900;padding:2px 12px;border-radius:8px;color:#fff;font-size:13px;}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);} .fb.ACC{background:var(--sub);}
+  button.b{border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;}
+  .b-pri{background:var(--accent);color:#fff;} .b-ok{background:var(--ok);color:#fff;}
+  .b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn)!important;}
+  .b-danger{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger)!important;}
+  .b-gray{background:#eef2f7;color:var(--text);border:1px solid var(--line)!important;}
+  input,select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--text);background:#fff;}
+  label.f{font-size:12px;color:var(--sub);display:block;margin:0 0 3px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .bar{height:16px;background:#e8ecf2;border-radius:99px;overflow:hidden;min-width:120px;flex:1;}
+  .bar>i{display:block;height:100%;background:var(--ok);}
+  .bar>i.low{background:var(--danger);}
+  .low-txt{color:var(--danger);font-weight:800;font-size:12px;}
+  .hide{display:none;}
+  .muted{color:var(--sub);font-size:13px;}
+  /* 상세 모달 */
+  #modal{position:fixed;inset:0;background:rgba(10,20,35,.55);display:none;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:30px 12px;}
+  #modal .m{background:#fff;border-radius:14px;max-width:820px;width:100%;padding:22px;}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:4px 10px;font-size:13.5px;}
+  .kv .k{color:var(--sub);}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1b2a;color:#fff;padding:10px 18px;border-radius:10px;font-weight:700;z-index:200;opacity:0;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="gate">
+  <div class="box">
+    <h2>管理者ページ</h2>
+    <p>パスワードを入力してください</p>
+    <input id="pw" type="password" placeholder="パスワード" autofocus>
+    <button onclick="doLogin()">ログイン</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<header>
+  <h1>CDI 管理</h1>
+  <div class="links">
+    <a href="/dashboard" target="_blank">ダッシュボード</a>
+    <a href="/input" target="_blank">注文入力</a>
+    <a href="#" onclick="logout();return false;">ログアウト</a>
+  </div>
+</header>
+<div class="tabs" id="tabs"></div>
+<main id="main"></main>
+
+<div id="modal" onclick="if(event.target.id==='modal')closeModal()"><div class="m" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TABS = [
+  ["inv","在庫"],["orders","注文"],["ship","出荷"],["print","印刷"],
+  ["err","エラー"],["fire","消防法"],["stats","統計"],["export","書出し"],["settings","設定"]
+];
+let PW = sessionStorage.getItem("adminpw") || "";
+let curTab = "inv";
+
+const hdr = () => ({ "X-Admin-Pass": PW, "Content-Type": "application/json" });
+const esc = s => (s==null?"":String(s)).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+async function api(path, opt={}){
+  const r = await fetch(path, Object.assign({headers:hdr()}, opt));
+  if(r.status===401){ logout(); throw new Error("認証切れ"); }
+  if(!r.ok){ const e=await r.json().catch(()=>({detail:r.status})); throw new Error(e.detail||r.status); }
+  return r.status===204?null:r.json();
+}
+
+// ---- 로그인 ----
+async function doLogin(){
+  const pw = document.getElementById("pw").value;
+  try{
+    const r = await fetch("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})});
+    if(!r.ok){ document.getElementById("loginErr").textContent="パスワードが違います"; return; }
+    PW = pw; sessionStorage.setItem("adminpw", pw);
+    document.getElementById("gate").style.display="none";
+    boot();
+  }catch(e){ document.getElementById("loginErr").textContent="接続エラー"; }
+}
+function logout(){ sessionStorage.removeItem("adminpw"); PW=""; location.reload(); }
+document.getElementById("pw").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+
+function boot(){
+  document.getElementById("tabs").innerHTML = TABS.map(([k,n])=>`<button data-t="${k}" onclick="go('${k}')">${n}</button>`).join("");
+  go("inv");
+}
+function go(t){
+  curTab=t;
+  [...document.querySelectorAll(".tabs button")].forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  RENDER[t]();
+}
+
+// 자동 로그인(세션에 비번 있으면)
+if(PW){ document.getElementById("gate").style.display="none"; boot(); }
+
+// ================= 각 탭 =================
+const RENDER = {};
+
+// ---- 在庫 ----
+RENDER.inv = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>在庫管理</h2><div id="invBody" class="muted">読み込み中...</div></div>
+    <div class="panel"><h2>入出庫履歴</h2><div id="invHist" class="muted">...</div></div>`;
+  try{
+    const d = await api("/api/admin/inventory");
+    const rowHtml = it=>{
+      const pct=Math.max(2,Math.round(it.remain/it.cap*100));
+      return `<tr>
+        <td><span class="fb ${it.kind==='fabric'?it.name:'ACC'}">${esc(it.name)}</span></td>
+        <td style="width:40%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>
+        <td><b>${it.remain}</b> <span class="muted">/ ${it.cap} ${esc(it.unit)}</span> ${it.low?'<span class="low-txt">要発注</span>':''}</td>
+        <td class="muted">発注点 <input type="number" value="${it.reorder}" style="width:56px" onchange="setReorder('${it.kind}','${it.id}',this.value)"></td>
+        <td>
+          <button class="b b-ok" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',1)">＋入庫</button>
+          <button class="b b-warn" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',-1)">−消尽</button>
+        </td></tr>`;
+    };
+    document.getElementById("invBody").innerHTML =
+      `<h3>生地(ロール)</h3><table>${d.fabric.map(rowHtml).join("")}</table>
+       <h3>付属品</h3><table>${d.accessories.map(rowHtml).join("")}</table>`;
+    const h = await api("/api/admin/inventory/history?limit=40");
+    document.getElementById("invHist").innerHTML = h.length? `<table>
+      <tr><th>時刻</th><th>対象</th><th>区分</th><th>増減</th><th>残</th><th>メモ</th></tr>
+      ${h.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.target)}</td>
+        <td><span class="pill">${x.reason==='in'?'入庫':x.reason==='out'?'消尽':'調整'}</span></td>
+        <td style="color:${x.delta<0?'var(--danger)':'var(--ok)'}"><b>${x.delta>0?'+':''}${x.delta}</b></td>
+        <td>${x.balance??''}</td><td class="muted">${esc(x.note||'')}</td></tr>`).join("")}</table>`
+      : `<div class="muted">履歴なし</div>`;
+  }catch(e){ document.getElementById("invBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+async function adjust(kind,id,name,sign){
+  const q = prompt(`${name} の${sign>0?'入庫':'消尽'}数量を入力`, "1");
+  if(q===null) return;
+  const n = Math.abs(parseInt(q,10)||0); if(!n) return;
+  const note = prompt("メモ(任意)","")||null;
+  try{ await api("/api/admin/inventory/adjust",{method:"POST",body:JSON.stringify({kind,id,delta:sign*n,reason:sign>0?'in':'out',note})});
+    toast("反映しました"); RENDER.inv();
+  }catch(e){ alert(e.message); }
+}
+async function setReorder(kind,id,v){
+  try{ await api("/api/admin/inventory/reorder",{method:"POST",body:JSON.stringify({kind,id,reorder_point:parseInt(v,10)||0})}); toast("発注点を更新"); RENDER.inv(); }
+  catch(e){ alert(e.message); }
+}
+
+// ---- 注文 ----
+RENDER.orders = ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>注文内訳</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div><label class="f">検索(注文番号/顧客)</label><input id="fq" placeholder="ORD-... / 山田"></div>
+      <div><label class="f">チャネル</label><select id="fch"><option value="">全部</option><option>rakuten</option><option>amazon</option><option>yahoo</option><option>base_ec</option></select></div>
+      <div><label class="f">決済</label><select id="fpay"><option value="">全部</option><option>paid</option><option>pending</option><option>unpaid</option></select></div>
+      <div><label class="f">状態</label><select id="fst"><option value="">全部</option><option>confirmed</option><option>production</option><option>shipped</option><option>closed</option><option>cancelled</option></select></div>
+      <div><label class="f">期間</label><input id="fdf" type="date"> ~ <input id="fdt" type="date"></div>
+      <button class="b b-pri" onclick="loadOrders()">検索</button>
+    </div>
+    <div id="ordBody" class="muted">検索してください</div></div>`;
+  loadOrders();
+};
+async function loadOrders(){
+  const p=new URLSearchParams();
+  const g=id=>document.getElementById(id).value;
+  if(g("fq"))p.set("q",g("fq")); if(g("fch"))p.set("channel",g("fch"));
+  if(g("fpay"))p.set("payment",g("fpay")); if(g("fst"))p.set("status",g("fst"));
+  if(g("fdf"))p.set("date_from",g("fdf")); if(g("fdt"))p.set("date_to",g("fdt"));
+  try{
+    const d = await api("/api/admin/orders?"+p.toString());
+    document.getElementById("ordBody").innerHTML = d.length? `<table>
+      <tr><th>注文番号</th><th>受注日時</th><th>チャネル</th><th>顧客</th><th>決済</th><th>状態</th><th>明細</th><th>進行(最小)</th></tr>
+      ${d.map(o=>`<tr class="click" onclick="orderDetail('${o.order_no}')">
+        <td><b>${esc(o.order_no)}</b></td><td>${esc(o.ordered_at)}</td><td><span class="pill">${esc(o.channel)}</span></td>
+        <td>${esc(o.customer_name)}</td><td>${esc(o.payment_status)}</td>
+        <td><span class="pill">${esc(o.order_status)}</span></td><td>${o.items}</td><td>${esc(o.min_stage_name)}</td></tr>`).join("")}</table>`
+      : `<div class="muted">該当なし</div>`;
+  }catch(e){ document.getElementById("ordBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function orderDetail(no){
+  try{
+    const d = await api("/api/admin/orders/"+encodeURIComponent(no));
+    const o=d.order;
+    const itemsHtml = d.items.map(it=>`<tr>
+        <td><b>${esc(it.barcode)}</b></td><td><span class="fb ${it.fabric}">${it.fabric}</span></td>
+        <td>${esc(it.size)}</td><td>${esc(it.product_type)}×${it.quantity}</td>
+        <td>上:${esc(it.opts.top)} 下:${esc(it.opts.bottom)} 左:${esc(it.opts.left)} 右:${esc(it.opts.right)}</td>
+        <td><select onchange="fixStage('${it.barcode}',this.value)">${
+          [0,1,2,3,4,5,6,7,8].map(s=>`<option value="${s}" ${s===it.stage?'selected':''}>${s} ${it.stage_name&&s===it.stage?it.stage_name:''}</option>`).join("")}</select></td>
+        <td><a class="b b-gray" href="/label/${encodeURIComponent(it.barcode)}?print=1" target="_blank" style="text-decoration:none">🖨 ラベル</a></td>
+      </tr>`).join("");
+    const scans = d.scans.length? `<table><tr><th>時刻</th><th>製品</th><th>工程</th><th>種別</th></tr>${
+      d.scans.map(s=>`<tr><td>${esc(s.t)}</td><td>${esc(s.barcode)}</td><td>${esc(s.stage_name)}</td><td>${esc(s.event)}</td></tr>`).join("")}</table>`
+      : `<div class="muted">スキャン履歴なし</div>`;
+    const ships = d.shipments.length? d.shipments.map(s=>`送り状 ${esc(s.tracking_no||'—')} / ${esc(s.shipping_status)} / ${esc(s.bizlogi_status)}`).join("<br>") : `<span class="muted">なし</span>`;
+    document.getElementById("modalBody").innerHTML=`
+      <div style="display:flex;align-items:center"><h2 style="margin:0;flex:1">${esc(o.order_no)}</h2>
+        <button class="b b-gray" onclick="closeModal()">閉じる</button></div>
+      <div class="row" style="margin:14px 0">
+        <div><label class="f">注文番号</label><input id="e_orderno" value="${esc(o.order_no)}" style="width:190px;font-weight:800"></div>
+        <div><label class="f">顧客</label><input id="e_name" value="${esc(o.customer_name)}"></div>
+        <div><label class="f">電話</label><input id="e_phone" value="${esc(o.phone||'')}"></div>
+        <div><label class="f">郵便</label><input id="e_postal" value="${esc(o.postal_code||'')}" style="width:90px"></div>
+        <div style="flex:1;min-width:220px"><label class="f">住所</label><input id="e_addr" value="${esc(o.address||'')}" style="width:100%"></div>
+        <div><label class="f">決済</label><select id="e_pay">${['paid','pending','unpaid','refunded'].map(x=>`<option ${x===o.payment_status?'selected':''}>${x}</option>`).join("")}</select></div>
+        <button class="b b-pri" onclick="saveOrder('${o.order_no}')">保存</button>
+        <button class="b b-danger" onclick="cancelOrder('${o.order_no}')">注文取消</button>
+      </div>
+      <h3>明細(工程プルダウンで補正 / ラベル再印刷)</h3>
+      <table><tr><th>バーコード</th><th>生地</th><th>サイズ</th><th>商品</th><th>加工</th><th>工程</th><th></th></tr>${itemsHtml}</table>
+      <h3>スキャン履歴</h3>${scans}
+      <h3>出荷</h3>${ships}`;
+    document.getElementById("modal").style.display="flex";
+  }catch(e){ alert(e.message); }
+}
+function closeModal(){ document.getElementById("modal").style.display="none"; }
+async function saveOrder(no){
+  const g=id=>document.getElementById(id).value;
+  try{ const res=await api("/api/admin/orders/"+encodeURIComponent(no),{method:"PATCH",body:JSON.stringify({
+    order_no:g("e_orderno"),customer_name:g("e_name"),phone:g("e_phone"),postal_code:g("e_postal"),address:g("e_addr"),payment_status:g("e_pay")})});
+    toast("保存しました"); loadOrders();
+    if(res && res.order_no && res.order_no!==no){ orderDetail(res.order_no); }  // 注文番号変更→開き直し(バーコードも再生成済)
+  }catch(e){ alert(e.message); }
+}
+async function cancelOrder(no){
+  if(!confirm(no+" を取消しますか?")) return;
+  try{ await api("/api/admin/orders/"+encodeURIComponent(no)+"/cancel",{method:"POST"}); toast("取消しました"); closeModal(); loadOrders(); }
+  catch(e){ alert(e.message); }
+}
+async function fixStage(bc,stage){
+  try{ await api("/api/admin/items/"+encodeURIComponent(bc)+"/stage",{method:"PATCH",body:JSON.stringify({stage:parseInt(stage,10)})}); toast("工程を補正"); }
+  catch(e){ alert(e.message); }
+}
+
+// ---- 出荷 ----
+RENDER.ship = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>出荷管理</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div><label class="f">注文番号</label><input id="s_no" placeholder="ORD-..."></div>
+      <div><label class="f">送り状番号</label><input id="s_track"></div>
+      <div><label class="f">出荷状態</label><select id="s_st"><option value="">-</option><option>ready</option><option>label_printed</option><option>handed_to_sagawa</option><option>completed</option></select></div>
+      <div><label class="f">BizLogi</label><select id="s_bl"><option value="">-</option><option>not_requested</option><option>requested</option><option>issued</option></select></div>
+      <button class="b b-pri" onclick="saveShip()">保存/作成</button>
+    </div><div id="shipBody" class="muted">...</div></div>`;
+  loadShip();
+};
+async function loadShip(){
+  try{ const d=await api("/api/admin/shipments");
+    document.getElementById("shipBody").innerHTML = d.length? `<table>
+      <tr><th>注文番号</th><th>顧客</th><th>送り状</th><th>送り状番号</th><th>出荷状態</th><th>BizLogi</th><th>口数</th></tr>
+      ${d.map(s=>`<tr><td>${esc(s.order_no)}</td><td>${esc(s.customer_name)}</td><td>${esc(s.shipment_no)}</td>
+        <td>${esc(s.tracking_no||'—')}</td><td><span class="pill">${esc(s.shipping_status)}</span></td>
+        <td>${esc(s.bizlogi_status)}</td><td>${s.package_count}</td></tr>`).join("")}</table>`
+      : `<div class="muted">出荷データなし</div>`;
+  }catch(e){ document.getElementById("shipBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function saveShip(){
+  const g=id=>document.getElementById(id).value;
+  if(!g("s_no")){ alert("注文番号を入力"); return; }
+  const body={order_no:g("s_no")};
+  if(g("s_track"))body.tracking_no=g("s_track");
+  if(g("s_st"))body.shipping_status=g("s_st");
+  if(g("s_bl"))body.bizlogi_status=g("s_bl");
+  try{ await api("/api/admin/shipments",{method:"POST",body:JSON.stringify(body)}); toast("保存しました"); loadShip(); }
+  catch(e){ alert(e.message); }
+}
+
+// ---- 印刷 ----
+RENDER.print = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>印刷履歴</h2><div id="prBody" class="muted">...</div></div>`;
+  try{ const d=await api("/api/admin/prints");
+    document.getElementById("prBody").innerHTML = d.length? `<table>
+      <tr><th>注文</th><th>対象</th><th>プリンタ</th><th>状態</th><th>時刻</th><th>エラー</th></tr>
+      ${d.map(p=>`<tr><td>${esc(p.order_no||'')}</td><td>${esc(p.target)}</td><td>${esc(p.printer)}</td>
+        <td><span class="pill">${esc(p.status)}</span></td><td>${esc(p.printed_at)}</td><td class="low-txt">${esc(p.error||'')}</td></tr>`).join("")}</table>`
+      : `<div class="muted">印刷ジョブなし(ラベルは注文詳細から🖨で再印刷できます)</div>`;
+  }catch(e){ document.getElementById("prBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+
+// ---- エラー ----
+RENDER.err = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>連携エラー(失敗ログ)</h2><div id="errBody" class="muted">...</div></div>`;
+  try{ const d=await api("/api/admin/sync-logs?status=failed");
+    document.getElementById("errBody").innerHTML = d.length? `<table>
+      <tr><th>時刻</th><th>注文</th><th>システム</th><th>処理</th><th>内容</th></tr>
+      ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.order_no||'')}</td><td>${esc(x.system)}</td><td>${esc(x.action)}</td><td class="low-txt">${esc(x.error||'')}</td></tr>`).join("")}</table>`
+      : `<div class="muted">エラーなし 👍</div>`;
+  }catch(e){ document.getElementById("errBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+
+// ---- 消防法 ----
+RENDER.fire = ()=>{
+  const M=document.getElementById("main");
+  const now=new Date(); const mth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  M.innerHTML=`<div class="panel"><h2>消防法 月次報告</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div><label class="f">対象月</label><input id="fmonth" type="month" value="${mth}"></div>
+      <button class="b b-pri" onclick="loadFire()">照会</button>
+      <button class="b b-ok" onclick="dlFire()">CSV書出し</button>
+    </div><div id="fireBody" class="muted">照会してください</div></div>`;
+  loadFire();
+};
+async function loadFire(){
+  const m=document.getElementById("fmonth").value;
+  try{ const d=await api("/api/admin/fire-report?month="+m);
+    document.getElementById("fireBody").innerHTML = d.length? `<div class="muted" style="margin-bottom:8px">${d.length} 件</div><table>
+      <tr><th>注文番号</th><th>販売日</th><th>チャネル</th><th>商品</th><th>生地</th><th>サイズ</th><th>数量</th><th>防炎番号</th><th>購入者</th></tr>
+      ${d.map(r=>`<tr><td>${esc(r.order_no)}</td><td>${esc(r.sold_at)}</td><td>${esc(r.channel)}</td><td>${esc(r.product_type)}</td>
+        <td>${esc(r.fabric)}</td><td>${esc(r.size)}</td><td>${r.quantity}</td><td>${esc(r.fire_cert_no||'')}</td><td>${esc(r.buyer)}</td></tr>`).join("")}</table>`
+      : `<div class="muted">該当月の販売なし</div>`;
+  }catch(e){ document.getElementById("fireBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+function dlFire(){ const m=document.getElementById("fmonth").value; window.open(`/api/admin/fire-report.csv?month=${m}&pw=${encodeURIComponent(PW)}`,"_blank"); }
+
+// ---- 統計 ----
+RENDER.stats = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>統計</h2><div id="stBody" class="muted">...</div></div>`;
+  try{ const d=await api("/api/admin/stats");
+    const maxDaily=Math.max(1,...d.daily.map(x=>x.count));
+    document.getElementById("stBody").innerHTML=`
+      <div class="row" style="gap:24px;margin-bottom:16px">
+        <div><div style="font-size:30px;font-weight:900">${d.total_orders}</div><div class="muted">総注文</div></div>
+        <div><div style="font-size:30px;font-weight:900">${d.total_items}</div><div class="muted">総明細</div></div>
+      </div>
+      <h3>直近14日 受注</h3><table>${d.daily.map(x=>`<tr><td style="width:70px">${esc(x.d)}</td>
+        <td><div class="bar"><i style="width:${x.count/maxDaily*100}%;background:var(--accent)"></i></div></td><td style="width:40px"><b>${x.count}</b></td></tr>`).join("")||'<tr><td class="muted">データなし</td></tr>'}</table>
+      <h3>チャネル別</h3><table>${d.by_channel.map(x=>`<tr><td>${esc(x.channel)}</td><td><b>${x.count}</b></td></tr>`).join("")}</table>
+      <h3>生地別(明細数 / 数量)</h3><table>${d.by_fabric.map(x=>`<tr><td><span class="fb ${x.fabric}">${x.fabric}</span></td><td>${x.count} 件</td><td>${x.qty} 枚</td></tr>`).join("")}</table>`;
+  }catch(e){ document.getElementById("stBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+
+// ---- 書出し ----
+RENDER.export = ()=>{
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>データ書出し(CSV)</h2>
+    <p class="muted">Excelで開ける形式(BOM付きUTF-8)で保存します。</p>
+    <div class="row">
+      <button class="b b-ok" onclick="dl('orders')">注文一覧 CSV</button>
+      <button class="b b-ok" onclick="dl('inventory')">在庫 CSV</button>
+    </div></div>`;
+};
+function dl(what){ window.open(`/api/admin/export/${what}.csv?pw=${encodeURIComponent(PW)}`,"_blank"); }
+
+// ---- 設定 ----
+RENDER.settings = async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>設定</h2><div id="setBody" class="muted">...</div></div>`;
+  try{ const s=await api("/api/admin/settings");
+    document.getElementById("setBody").innerHTML=`
+      <h3>プリンタ割当</h3>
+      <div class="row">
+        <div><label class="f">作業指示書</label><input id="p_work" value="${esc(s.printer_work||'')}"></div>
+        <div><label class="f">製品ラベル</label><input id="p_label" value="${esc(s.printer_label||'')}"></div>
+        <div><label class="f">送り状</label><input id="p_ship" value="${esc(s.printer_ship||'')}"></div>
+        <button class="b b-pri" onclick="savePrinters()">保存</button>
+      </div>
+      <h3>管理者パスワード変更</h3>
+      <div class="row">
+        <div><label class="f">新しいパスワード</label><input id="np" type="password"></div>
+        <button class="b b-danger" onclick="changePw()">変更</button>
+      </div>`;
+  }catch(e){ document.getElementById("setBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+async function savePrinters(){
+  const g=id=>document.getElementById(id).value;
+  try{ await api("/api/admin/settings",{method:"POST",body:JSON.stringify({values:{printer_work:g("p_work"),printer_label:g("p_label"),printer_ship:g("p_ship")}})}); toast("保存しました"); }
+  catch(e){ alert(e.message); }
+}
+async function changePw(){
+  const np=document.getElementById("np").value;
+  if(!np){ alert("新しいパスワードを入力"); return; }
+  if(!confirm("パスワードを変更しますか?")) return;
+  try{ await api("/api/admin/settings",{method:"POST",body:JSON.stringify({values:{admin_password:np}})});
+    PW=np; sessionStorage.setItem("adminpw",np); toast("変更しました");
+  }catch(e){ alert(e.message); }
+}
+</script>
+</body>
+</html>

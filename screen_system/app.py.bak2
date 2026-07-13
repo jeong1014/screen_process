@@ -1,0 +1,363 @@
+"""
+スクリーン原団 工場工程管理システム — FastAPI バックエンド (v2)
+worker_v5.html / dashboard_v2_2.html の API契約に整合。
+
+役割: ブラウザHTML(入力/作業者/ダッシュボード)と PostgreSQL の仲介。
+  進行状態 stage(0〜8) を order_items.current_stage で一元管理。
+  「注文番号(製品番号)」= order_items.barcode。
+
+実行:  uvicorn app:app --reload --host 0.0.0.0 --port 8000
+必要:  pip install fastapi uvicorn "psycopg[binary]"
+DB  :  環境変数 DATABASE_URL
+"""
+
+import os
+import json
+from datetime import date, datetime
+from typing import Optional, List
+
+import psycopg
+from psycopg.rows import dict_row
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# ===== 設定 =====
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/screen")
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
+MAX_STAGE = 8
+
+app = FastAPI(title="スクリーン原団 工程管理 v2")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+def db():
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+
+
+# =============================================================================
+# 表示用フォーマット (DBの構造データ → 各画面が期待する文字列)
+# =============================================================================
+SIDE_JA = {"top": "上", "bottom": "下", "left": "左", "right": "右"}
+PROC_BY_STAGE = {1: "裁断", 2: "裁断", 3: "ミシン", 4: "ミシン",
+                 5: "ハトメ", 6: "ハトメ", 7: "梱包", 8: "梱包"}
+
+
+def fmt_opt(kind: str, mm) -> str:
+    """ダッシュボード opts 用: 上/下/左/右 それぞれの加工文字列。"""
+    if kind == "eyelet":
+        return f"ハトメP{mm}" if mm else "ハトメ"
+    if kind == "skirt":
+        return "スカート"
+    if kind == "velcro":
+        return "ベルクロ"
+    return "なし"
+
+
+def eyelet_val(kind: str, mm) -> str:
+    """作業者画面ハトメ工程 用: その辺のハトメ間隔。ハトメ以外は なし。"""
+    if kind == "eyelet":
+        return f"P{mm}" if mm else "P"
+    return "なし"
+
+
+def size_str(w, h) -> str:
+    return f"W{w}×H{h}"
+
+
+def qty_str(product_type: str, q: int) -> str:
+    if product_type == "two_sheet_set":
+        return f"{q}セット / 合計{q*2}枚"
+    return f"{q}枚"
+
+
+def item_sides(row):
+    """4辺の (kind, mm) を返す。"""
+    return {
+        "top":    (row["process_top"],    row["process_top_mm"]),
+        "bottom": (row["process_bottom"], row["process_bottom_mm"]),
+        "left":   (row["process_left"],   row["process_left_mm"]),
+        "right":  (row["process_right"],  row["process_right_mm"]),
+    }
+
+
+def worker_payload(row):
+    """作業者画面 GET /api/orders/{no} の応答形。"""
+    s = item_sides(row)
+    velcro_sides = [SIDE_JA[k] for k, (kind, _) in s.items() if kind == "velcro"]
+    skirt_any = any(kind == "skirt" for kind, _ in s.values())
+    return {
+        "order_no": row["barcode"],
+        "fabric": row["fabric_type"],
+        "size": size_str(row["width_mm"], row["height_mm"]),
+        "magictape": "・".join(velcro_sides) if velcro_sides else "なし",
+        "skirt": "有り" if skirt_any else "無し",
+        "e_top":    eyelet_val(*s["top"]),
+        "e_bottom": eyelet_val(*s["bottom"]),
+        "e_left":   eyelet_val(*s["left"]),
+        "e_right":  eyelet_val(*s["right"]),
+        "stage": row["current_stage"],
+    }
+
+
+def board_status(stage: int):
+    """stage(0〜8) → 各工程の working/wait/done。"""
+    def st(done_at, wip_at):
+        return "done" if stage >= done_at else ("working" if stage == wip_at else "wait")
+    return {
+        "cutting": st(2, 1),
+        "sewing":  st(4, 3),
+        "eyelet":  st(6, 5),
+        "packing": st(8, 7),
+    }
+
+
+# =============================================================================
+# 入力モデル
+# =============================================================================
+class ItemIn(BaseModel):
+    product_type: str = "single"
+    fabric_type: str = "LN"
+    width_mm: int
+    height_mm: int
+    quantity: int = 1
+    process_top: str = "none"
+    process_top_mm: Optional[int] = None
+    process_bottom: str = "none"
+    process_bottom_mm: Optional[int] = None
+    process_left: str = "none"
+    process_left_mm: Optional[int] = None
+    process_right: str = "none"
+    process_right_mm: Optional[int] = None
+    fire_cert_no: Optional[str] = None
+
+
+class OrderIn(BaseModel):
+    channel: str
+    customer_name: str
+    postal_code: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    payment_status: str = "paid"
+    mall_order_no: Optional[str] = None
+    ordered_at: Optional[str] = None
+    items: List[ItemIn] = Field(default_factory=list)
+
+
+class ScanIn(BaseModel):
+    order_no: str            # = barcode
+
+
+# =============================================================================
+# ページ
+# =============================================================================
+@app.get("/")
+def root():
+    return RedirectResponse("/input")
+
+@app.get("/input")
+def page_input():
+    return FileResponse(os.path.join(FRONTEND_DIR, "input.html"))
+
+@app.get("/worker")
+def page_worker():
+    return FileResponse(os.path.join(FRONTEND_DIR, "worker.html"))
+
+@app.get("/dashboard")
+def page_dashboard():
+    return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
+
+
+# =============================================================================
+# 入力: 注文全体(顧客+明細)  POST /api/orders
+# =============================================================================
+def next_order_no(cur) -> str:
+    today = date.today().strftime("%Y%m%d")
+    cur.execute("SELECT count(*) AS c FROM orders WHERE order_no LIKE %s", (f"ORD-{today}-%",))
+    return f"ORD-{today}-{cur.fetchone()['c']+1:04d}"
+
+
+@app.post("/api/orders")
+def create_order(order: OrderIn):
+    if not order.items:
+        raise HTTPException(400, "明細(items)が最低1件必要です。")
+    with db() as conn, conn.cursor() as cur:
+        order_no = next_order_no(cur)
+        cur.execute(
+            """INSERT INTO orders (order_no, channel, mall_order_no, customer_name, postal_code,
+                 address, phone, payment_status, order_status, raw_data, ordered_at)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'confirmed',%s,%s) RETURNING id""",
+            (order_no, order.channel, order.mall_order_no, order.customer_name, order.postal_code,
+             order.address, order.phone, order.payment_status,
+             json.dumps(order.model_dump(), ensure_ascii=False),
+             order.ordered_at or datetime.now().isoformat()),
+        )
+        order_id = cur.fetchone()["id"]
+        created = []
+        for i, it in enumerate(order.items, start=1):
+            barcode = f"{order_no}-{i:02d}"
+            cur.execute(
+                """INSERT INTO order_items (order_id, item_no, barcode, product_type, fabric_type,
+                     width_mm, height_mm, quantity, process_top, process_top_mm, process_bottom,
+                     process_bottom_mm, process_left, process_left_mm, process_right, process_right_mm,
+                     fire_cert_no)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING barcode""",
+                (order_id, i, barcode, it.product_type, it.fabric_type, it.width_mm, it.height_mm,
+                 it.quantity, it.process_top, it.process_top_mm, it.process_bottom, it.process_bottom_mm,
+                 it.process_left, it.process_left_mm, it.process_right, it.process_right_mm, it.fire_cert_no),
+            )
+            created.append(cur.fetchone()["barcode"])
+        conn.commit()
+    return {"order_no": order_no, "barcodes": created}
+
+
+# =============================================================================
+# 作業者画面
+# =============================================================================
+def _fetch_item(cur, barcode):
+    cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
+    return cur.fetchone()
+
+
+@app.get("/api/orders/{order_no}")
+def get_order(order_no: str):
+    """作業者画面: バーコードで製品情報+stage を取得。"""
+    with db() as conn, conn.cursor() as cur:
+        row = _fetch_item(cur, order_no)
+    if not row:
+        raise HTTPException(404, f"製品番号が見つかりません: {order_no}")
+    return worker_payload(row)
+
+
+def _move(order_no: str, delta: int):
+    with db() as conn, conn.cursor() as cur:
+        row = _fetch_item(cur, order_no)
+        if not row:
+            raise HTTPException(404, f"製品番号が見つかりません: {order_no}")
+        new_stage = min(MAX_STAGE, max(0, row["current_stage"] + delta))
+        et = "undo" if delta < 0 else ("complete" if new_stage % 2 == 0 else "start")
+        cur.execute(
+            """UPDATE order_items
+               SET current_stage=%s,
+                   started_at = COALESCE(started_at, CASE WHEN %s>0 THEN now() END),
+                   completed_at = CASE WHEN %s=%s THEN now() ELSE completed_at END
+               WHERE id=%s""",
+            (new_stage, delta, new_stage, MAX_STAGE, row["id"]),
+        )
+        cur.execute(
+            "INSERT INTO scan_events (order_item_id, stage_no, event_type, station) VALUES (%s,%s,%s,%s)",
+            (row["id"], new_stage, et, "worker_screen"),
+        )
+        cur.execute("SELECT * FROM order_items WHERE id=%s", (row["id"],))
+        row = cur.fetchone()
+        conn.commit()
+    return worker_payload(row)
+
+
+@app.post("/api/scan")
+def scan(s: ScanIn):
+    return _move(s.order_no, +1)
+
+
+@app.post("/api/scan/undo")
+def scan_undo(s: ScanIn):
+    return _move(s.order_no, -1)
+
+
+# =============================================================================
+# ダッシュボード
+# =============================================================================
+@app.get("/api/board")
+def api_board():
+    with db() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT oi.*, o.ordered_at
+               FROM order_items oi JOIN orders o ON o.id=oi.order_id
+               ORDER BY o.ordered_at NULLS LAST, oi.id"""
+        )
+        rows = cur.fetchall()
+    out = []
+    for r in rows:
+        s = item_sides(r)
+        out.append({
+            "order_no": r["barcode"],
+            "fabric": r["fabric_type"],
+            "size": size_str(r["width_mm"], r["height_mm"]),
+            "qty": qty_str(r["product_type"], r["quantity"]),
+            "opts": {side: fmt_opt(kind, mm) for side, (kind, mm) in s.items()},
+            "received_at": r["ordered_at"].strftime("%H:%M") if r["ordered_at"] else "--:--",
+            "status": board_status(r["current_stage"]),
+        })
+    return out
+
+
+@app.get("/api/events")
+def api_events(limit: int = 20):
+    with db() as conn, conn.cursor() as cur:
+        cur.execute(
+            """SELECT se.stage_no, se.event_type, se.scanned_at, oi.barcode
+               FROM scan_events se JOIN order_items oi ON oi.id=se.order_item_id
+               ORDER BY se.scanned_at DESC LIMIT %s""",
+            (limit,),
+        )
+        rows = cur.fetchall()
+    out = []
+    for r in rows:
+        stage, et = r["stage_no"], r["event_type"]
+        proc = PROC_BY_STAGE.get(stage, "受付")
+        if et == "undo":
+            ev, text = "start", f"{proc} 取消"
+        elif stage == MAX_STAGE:
+            ev, text = "ship", "梱包 完了(出荷準備)"
+        elif stage % 2 == 0 and stage > 0:
+            ev, text = "done", f"{proc} 完了"
+        else:
+            ev, text = "start", f"{proc} 開始"
+        out.append({"t": r["scanned_at"].strftime("%H:%M"), "order_no": r["barcode"], "ev": ev, "text": text})
+    return out
+
+
+@app.get("/api/inventory")
+def api_inventory():
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT fabric_type, remain_rolls, capacity_rolls FROM fabric_inventory ORDER BY fabric_type")
+        rows = cur.fetchall()
+    return [{"fabric": r["fabric_type"], "remain": r["remain_rolls"], "cap": r["capacity_rolls"]} for r in rows]
+
+
+@app.get("/api/accessories")
+def api_accessories():
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT name, remain, capacity, unit FROM accessories ORDER BY sort_order, id")
+        rows = cur.fetchall()
+    return [{"name": r["name"], "remain": r["remain"], "cap": r["capacity"], "unit": r["unit"]} for r in rows]
+
+
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+
+# =============================================================================
+# ラベル自動化: /label/{barcode} でラベルを開くと DB から自動で埋まる
+# =============================================================================
+@app.get("/label/{barcode}")
+def page_label(barcode: str):
+    return FileResponse(os.path.join(FRONTEND_DIR, "label.html"))
+
+
+@app.get("/api/label/{barcode}")
+def api_label(barcode: str):
+    with db() as conn, conn.cursor() as cur:
+        row = _fetch_item(cur, barcode)
+    if not row:
+        raise HTTPException(404, f"製品番号が見つかりません: {barcode}")
+    return {
+        "barcodeValue": row["barcode"],
+        "barcodeText": row["barcode"],
+        "fabric": row["fabric_type"],
+        "size": f"W:{row['width_mm']}×H:{row['height_mm']}",
+        "bohenNumber": row["fire_cert_no"] or "",
+        "qrValue": "https://cdigolf.base.ec/",
+    }

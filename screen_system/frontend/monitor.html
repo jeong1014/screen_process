@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程モニター | CDI</title>
+<style>
+  :root{
+    --bg:#0d1b2a; --panel:#16283c; --line:#274156; --text:#eaf2fb; --sub:#8aa6c0;
+    --ok:#22c55e; --ok-bg:#0f3b23; --start:#38bdf8; --start-bg:#0b3550; --err:#ff5a4d; --err-bg:#4a1512;
+    --ln:#14b8a6; --dp:#f59e0b; --sdp:#a78bfa;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--text);font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP",sans-serif;
+    overflow:hidden;display:flex;flex-direction:column;height:100vh;}
+  header{display:flex;align-items:center;gap:20px;padding:14px 28px;background:#0a1622;border-bottom:2px solid #22384e;}
+  header .proc{font-size:40px;font-weight:900;letter-spacing:3px;}
+  header .ko{font-size:18px;color:var(--sub);font-weight:800;}
+  header .right{margin-left:auto;display:flex;gap:26px;align-items:center;}
+  header .kpi{text-align:center;}
+  header .kpi .v{font-size:38px;font-weight:900;line-height:1;}
+  header .kpi .l{font-size:13px;color:var(--sub);font-weight:800;}
+  #clock{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;}
+
+  .main{flex:1;display:flex;gap:18px;padding:18px 24px;min-height:0;}
+  .left{flex:1.4;display:flex;flex-direction:column;gap:16px;min-width:0;}
+  .big{flex:1;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:var(--panel);border:3px solid #294056;text-align:center;padding:22px;}
+  .big.start{background:var(--start-bg);border-color:var(--start);}
+  .big.ok{background:var(--ok-bg);border-color:var(--ok);}
+  .big.err{background:var(--err-bg);border-color:var(--err);}
+  .big .res{font-size:60px;font-weight:900;letter-spacing:6px;line-height:1;}
+  .big.start .res{color:var(--start);} .big.ok .res{color:var(--ok);} .big.err .res{color:var(--err);}
+  .big .bc{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;margin:10px 0 4px;word-break:break-all;color:var(--sub);}
+  .big .hint{font-size:26px;color:var(--sub);font-weight:800;}
+  .big .rmeta{font-size:20px;color:var(--sub);font-weight:800;margin-top:8px;}
+  .fb{display:inline-block;font-weight:900;color:#04121f;border-radius:10px;padding:0 14px;}
+
+  /* 공정별 정보 (작업자 화면처럼 크게) */
+  .pf{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 22px;margin-top:16px;width:100%;}
+  .pf-item{background:rgba(255,255,255,.06);border-radius:16px;padding:16px 26px;min-width:200px;}
+  .pf-k{font-size:24px;font-weight:800;color:var(--sub);}
+  .pf-v{font-size:60px;font-weight:900;line-height:1.05;margin-top:4px;}
+  .pf-v.none{color:#6f8aa3;}
+
+  .right-col{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0;}
+  .col{flex:1;background:var(--panel);border:2px solid #294056;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
+  .col h2{margin:0 0 10px;font-size:24px;font-weight:900;display:flex;align-items:center;gap:10px;}
+  .col h2 .cnt{margin-left:auto;font-size:22px;background:#0a1622;border-radius:20px;padding:2px 14px;color:var(--sub);}
+  .col.wip{border-color:var(--start);}
+  .list{overflow:auto;flex:1;}
+  .it{display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid #22384e;font-size:26px;font-weight:800;}
+  .it .fbs{font-weight:900;color:#04121f;border-radius:8px;padding:0 10px;font-size:20px;}
+  .it .fbs.LN{background:var(--ln);} .it .fbs.DP{background:var(--dp);} .it .fbs.SDP{background:var(--sdp);}
+  .it .bc{font-variant-numeric:tabular-nums;}
+  .it .sz{margin-left:auto;color:var(--sub);font-size:22px;}
+  .empty{color:var(--sub);font-size:22px;font-weight:800;padding:24px;text-align:center;}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);}
+  .scanline{padding:8px 24px;background:#0a1622;color:var(--sub);font-size:15px;font-weight:800;border-top:2px solid #22384e;display:flex;gap:16px;align-items:center;}
+  .scanline input{background:#16283c;border:1px solid #294056;color:var(--text);border-radius:8px;padding:8px 10px;font-size:15px;min-width:220px;}
+</style>
+</head>
+<body>
+<header>
+  <div><span class="proc" id="procName">—</span> <span class="ko" id="procKo"></span> <span class="ko">モニター</span></div>
+  <div class="right">
+    <div class="kpi"><div class="v" id="qCount">0</div><div class="l">待機</div></div>
+    <div class="kpi"><div class="v" style="color:var(--start)" id="wCount">0</div><div class="l">作業中</div></div>
+    <div class="kpi"><div class="v" style="color:var(--ok)" id="doneCount">0</div><div class="l">本日完了</div></div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="left">
+    <div class="big" id="big"><div class="hint">ラベルのバーコードをスキャンしてください</div></div>
+  </div>
+  <div class="right-col">
+    <div class="col"><h2>待機 <span class="cnt" id="qc2">0</span></h2><div class="list" id="queue"></div></div>
+    <div class="col wip"><h2>作業中 <span class="cnt" id="wc2">0</span></h2><div class="list" id="wip"></div></div>
+  </div>
+</div>
+
+<div class="scanline">
+  <b>手動テスト:</b>
+  <input id="mbc" placeholder="バーコード" onkeydown="if(event.key==='Enter'){doScan(this.value);this.value='';}">
+  <span>※ 実スキャナはこの画面にフォーカスがあれば自動で読み取ります</span>
+  <span style="margin-left:auto" id="stime"></span>
+</div>
+
+<script>
+const PROC = location.pathname.split("/").filter(Boolean).pop();
+const REFRESH_MS = 3000;
+const esc = s => (s==null?"":String(s)).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+const NONE = ["なし","無し","無","-","—",""];
+let lastShownAt = 0;
+
+async function load(){
+  try{
+    const d = await fetch("/api/monitor/"+PROC).then(r=>r.json());
+    document.getElementById("procName").textContent = d.name_ja;
+    document.getElementById("procKo").textContent = d.name_ko;
+    document.getElementById("qCount").textContent = d.queue_count;
+    document.getElementById("wCount").textContent = d.wip_count;
+    document.getElementById("doneCount").textContent = d.today_done;
+    document.getElementById("qc2").textContent = d.queue_count;
+    document.getElementById("wc2").textContent = d.wip_count;
+    document.getElementById("stime").textContent = "サーバー "+d.server_time;
+    renderList("queue", d.queue);
+    renderList("wip", d.wip);
+    document.title = d.name_ja+"モニター | CDI";
+    if(!lastShownAt){ if(d.last) showResult(d.last, "最終 "+d.last.at); else showIdle(); }
+  }catch(e){}
+}
+function renderList(id, arr){
+  const el = document.getElementById(id);
+  el.innerHTML = arr.length ? arr.map(x=>`<div class="it">
+      <span class="fbs ${x.fabric}">${x.fabric}</span>
+      <span class="bc">${esc(x.barcode)}</span>
+      <span class="sz">${esc(x.size)}</span></div>`).join("")
+    : `<div class="empty">なし</div>`;
+}
+// 결과+공정별 정보(작업자 화면처럼) 크게 표시
+function showResult(o, extra){
+  const cls = o.result==="完了" ? "ok" : "start";
+  const fields = (o.fields||[]).map(f=>{
+    const none = NONE.includes(String(f[1]).trim());
+    return `<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v${none?' none':''}">${esc(none?'なし':f[1])}</div></div>`;
+  }).join("");
+  const b=document.getElementById("big"); b.className="big "+cls;
+  b.innerHTML=`<div class="res">${esc(o.result)}</div>
+    <div class="bc"><span class="fb ${o.fabric}">${esc(o.fabric)}</span> ${esc(o.barcode)}</div>
+    <div class="pf">${fields}</div>${extra?`<div class="rmeta">${esc(extra)}</div>`:""}`;
+}
+function showErr(o){
+  const fields = (o.fields||[]).map(f=>`<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v">${esc(f[1])}</div></div>`).join("");
+  const b=document.getElementById("big"); b.className="big err";
+  b.innerHTML=`<div class="res">エラー</div>
+    <div class="rmeta" style="font-size:30px;color:var(--err)">${esc(o.reason||"")}</div>
+    ${o.barcode?`<div class="bc">${esc(o.barcode)}</div>`:""}<div class="pf">${fields}</div>`;
+}
+function showIdle(){
+  document.getElementById("big").className="big";
+  document.getElementById("big").innerHTML=`<div class="hint">ラベルのバーコードをスキャンしてください</div>`;
+}
+async function doScan(code){
+  code=(code||"").trim(); if(!code) return;
+  try{
+    const d = await fetch("/api/monitor/"+PROC+"/scan",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({barcode:code})}).then(r=>r.json());
+    if(d.ok) showResult(d, null); else showErr(d);
+    lastShownAt = Date.now();
+    load();
+  }catch(e){ showErr({reason:"通信エラー"}); }
+}
+// 스캐너 = 키보드 입력 캡처(수동칸 제외)
+let buf="";
+document.addEventListener("keydown", e=>{
+  if(e.target && e.target.id==="mbc") return;
+  if(e.key==="Enter"){ if(buf.trim()) doScan(buf.trim()); buf=""; return; }
+  if(e.key.length===1) buf += e.key;
+});
+setInterval(()=>{ if(lastShownAt && Date.now()-lastShownAt>7000){ lastShownAt=0; load(); } }, 1000);
+setInterval(()=>{ document.getElementById("clock").textContent=new Date().toLocaleTimeString(); },1000);
+load(); setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
