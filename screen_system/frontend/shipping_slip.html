@@ -59,7 +59,8 @@ async function boot(){
         <div class="foot"><span>チャネル: ${esc(o.channel||"")}</span><span>決済: ${esc(o.payment_status||"")}</span></div>
       </div>`;
     document.title = "送り状 "+o.order_no;
-    setTimeout(()=>window.print(), 400);   // ハトメ完了時に自動で印刷ダイアログを出す
+    // ハトメ完了時: iframe内から自分自身を印刷(親のモニター画面ではなく送り状のみが印刷される)
+    setTimeout(()=>{ try{ window.focus(); }catch(e){} window.print(); }, 500);
   }catch(e){
     document.getElementById("root").outerHTML = `<div class="err">送り状を表示できません: ${esc(e.message)}<br>(${esc(barcode)})</div>`;
   }

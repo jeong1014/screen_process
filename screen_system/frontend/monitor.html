@@ -194,6 +194,20 @@ function showIdle(){
   document.getElementById("big").className="big";
   document.getElementById("big").innerHTML=`<div class="hint">ラベルのバーコードをスキャンしてください</div>`;
 }
+// ハトメ完了時の送り状印刷。ポップアップ(window.open)は await 後だとブロックされるため、
+// 非表示の iframe に送り状ページを読み込ませる。送り状ページ側が読み込み後に自分で印刷する。
+function printShippingSlip(barcode){
+  let f = document.getElementById("slipFrame");
+  if(!f){
+    f = document.createElement("iframe");
+    f.id = "slipFrame";
+    f.style.cssText = "position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:0;";
+    document.body.appendChild(f);
+  }
+  // 同じ注文を続けてスキャンしても再読込→再印刷されるよう、一旦空にしてから設定
+  f.src = "about:blank";
+  setTimeout(()=>{ f.src = "/shipping-slip/" + encodeURIComponent(barcode); }, 30);
+}
 async function doScan(code){
   code=(code||"").trim(); if(!code) return;
   // 在庫QRシリアル(例 11-00001)なら工程進行ではなく在庫消尽へ
@@ -203,9 +217,9 @@ async function doScan(code){
       body:JSON.stringify({barcode:code})}).then(r=>r.json());
     if(d.ok){
       showResult(d, null);
-      // ハトメ工程で「完了」したら、その注文の送り状を自動で開いて印刷する
+      // ハトメ工程で「完了」したら、その注文の送り状を自動で印刷する
       if(PROC==='eyelet' && d.result==='完了' && d.barcode){
-        window.open('/shipping-slip/'+encodeURIComponent(d.barcode), '_blank');
+        printShippingSlip(d.barcode);
       }
     } else showErr(d);
     lastShownAt = Date.now();
