@@ -13,6 +13,9 @@ DB  :  環境変数 DATABASE_URL
 
 import os
 import json
+import subprocess
+from weasyprint import HTML
+
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -138,6 +141,54 @@ def board_status(stage: int):
         "packing": st(8, 7),
     }
 
+# 프린터 설정 로드
+def get_printer_name(printer_key: str) -> str:
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "printer_config.json")
+    if not os.path.exists(config_path):
+        print("⚠️ 프린터 설정 파일(printer_config.json)이 없어 기본 기본 프린터를 사용합니다.")
+        return ""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+            return cfg.get(printer_key, "")
+    except Exception as e:
+        print(f"❌ 프린터 설정 로드 실패: {e}")
+        return ""
+
+def silent_print_html(html_content: str, printer_key: str):
+    """HTML 소스를 받아 PDF로 렌더링한 후, 지정된 프린터로 조용히 출력합니다."""
+    printer_name = get_printer_name(printer_key)
+    if not printer_name:
+        print(f"⚠️ {printer_key}에 매핑된 프린터가 없습니다. 출력을 건너뜁니다.")
+        return
+
+    pdf_temp_path = "temp_print_job.pdf"
+    sumatra_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SumatraPDF.exe")
+
+    try:
+        # 1. WeasyPrint를 사용해 HTML을 규격에 맞는 PDF로 변환 (CSS @page 반영됨)
+        HTML(string=html_content).write_pdf(pdf_temp_path)
+        
+        # 2. SumatraPDF를 이용해 백그라운드 무설정 출력 실행
+        # -print-to <프린터명>: 해당 프린터로 즉시 전송
+        # -print-settings "noscale": 라벨 인쇄 시 여백/스케일 왜곡 방지
+        cmd = [
+            sumatra_path,
+            "-print-to", printer_name,
+            "-print-settings", "noscale",
+            pdf_temp_path
+        ]
+        
+        print(f"🖨️ [{printer_name}] 출력 요청 전송 중...")
+        subprocess.run(cmd, check=True)
+        print("✅ 출력 완료!")
+
+    except Exception as e:
+        print(f"❌ 자동 출력 중 에러 발생: {e}")
+    finally:
+        # 임시 생성된 PDF 파일 제거
+        if os.path.exists(pdf_temp_path):
+            os.remove(pdf_temp_path)
 
 # =============================================================================
 # 入力モデル
@@ -311,6 +362,25 @@ def create_order(order: OrderIn):
                 created.append(insert_item(seq, barcode, it, it.fabric_type,
                                             it.width_mm, it.height_mm, None, None))
         conn.commit()
+    for item in saved_items:
+        # 주문 라벨용 HTML 템플릿 (110mm x 290mm 등 규격에 맞게 조정)
+        label_html = f"""
+        <html>
+        <head>
+            <style>
+                @page {{ size: 110mm 290mm; margin: 0; }}
+                body {{ font-family: sans-serif; padding: 20px; }}
+            </style>
+        </head>
+        <body>
+            <h1>CDI SCREEN</h1>
+            <h2>주문번호: {item['barcode']}</h2>
+            <p>원단: {item['fabric_type']} | 크기: {item['width_mm']}x{item['height_mm']}</p>
+        </body>
+        </html>
+        """
+        # "order_printer" 라는 이름으로 설정된 프린터로 출력 전송
+        silent_print_html(label_html, "order_printer")
     return {"order_no": order_no, "barcodes": created}
 
 
@@ -366,6 +436,30 @@ def _move(order_no: str, delta: int):
         row = cur.fetchone()
         pair_bc = _pair_barcode(cur, row)
         conn.commit()
+    if new_stage == MAX_STAGE and step > 0:  # 마지막 단계(8)로 전진 이동한 경우
+        # 송장/출고지시서 HTML 템플릿 (A4 사이즈)
+        invoice_html = f"""
+        <html>
+        <head>
+            <style>
+                @page {{ size: A4; margin: 20mm; }}
+                body {{ font-family: sans-serif; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+                th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
+            </style>
+        </head>
+        <body>
+            <h1>[출고 송장]</h1>
+            <h3>주문번호: {order_no}</h3>
+            <table>
+                <tr><th>항목</th><th>상태</th></tr>
+                <tr><td>스크린 제품 ({order_no})</td><td>최종 포장 및 출고 대기</td></tr>
+            </table>
+        </body>
+        </html>
+        """
+        # "invoice_printer" 라는 이름으로 설정된 프린터로 출력 전송
+        silent_print_html(invoice_html, "invoice_printer")
     return worker_payload(row, pair_bc)
 
 
