@@ -1,0 +1,20 @@
+[
+    {
+        "port": "COM3",
+        "baudrate": 9600,
+        "type": "monitor",
+        "proc": "cutting"
+    },
+    {
+        "port": "COM4",
+        "baudrate": 9600,
+        "type": "monitor",
+        "proc": "sewing"
+    },
+    {
+        "port": "COM5",
+        "baudrate": 9600,
+        "type": "monitor",
+        "proc": "eyelet"
+    }
+]
