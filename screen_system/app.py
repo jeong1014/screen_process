@@ -11,6 +11,7 @@ worker_v5.html / dashboard_v2_2.html の API契約に整合。
 DB  :  環境変数 DATABASE_URL
 """
 
+import code
 import os
 import json
 import subprocess
@@ -29,6 +30,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+from print_templates import render_inventory_label, render_order_label, render_shipping_slip
 
 # ===== 設定 =====
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1234@localhost:5432/screen")
@@ -362,25 +365,16 @@ def create_order(order: OrderIn):
                 created.append(insert_item(seq, barcode, it, it.fabric_type,
                                             it.width_mm, it.height_mm, None, None))
         conn.commit()
-    for item in saved_items:
-        # 주문 라벨용 HTML 템플릿 (110mm x 290mm 등 규격에 맞게 조정)
-        label_html = f"""
-        <html>
-        <head>
-            <style>
-                @page {{ size: 110mm 290mm; margin: 0; }}
-                body {{ font-family: sans-serif; padding: 20px; }}
-            </style>
-        </head>
-        <body>
-            <h1>CDI SCREEN</h1>
-            <h2>주문번호: {item['barcode']}</h2>
-            <p>원단: {item['fabric_type']} | 크기: {item['width_mm']}x{item['height_mm']}</p>
-        </body>
-        </html>
-        """
-        # "order_printer" 라는 이름으로 설정된 프린터로 출력 전송
-        silent_print_html(label_html, "order_printer")
+    for barcode in created:
+        # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
+        cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
+        item_row = cur.fetchone()
+        
+        # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
+        item_data = worker_payload(item_row)
+        
+        html_content = render_order_label(item_data)
+        silent_print_html(html_content, "order_printer")
     return {"order_no": order_no, "barcodes": created}
 
 
@@ -436,30 +430,15 @@ def _move(order_no: str, delta: int):
         row = cur.fetchone()
         pair_bc = _pair_barcode(cur, row)
         conn.commit()
-    if new_stage == MAX_STAGE and step > 0:  # 마지막 단계(8)로 전진 이동한 경우
-        # 송장/출고지시서 HTML 템플릿 (A4 사이즈)
-        invoice_html = f"""
-        <html>
-        <head>
-            <style>
-                @page {{ size: A4; margin: 20mm; }}
-                body {{ font-family: sans-serif; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-                th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
-            </style>
-        </head>
-        <body>
-            <h1>[출고 송장]</h1>
-            <h3>주문번호: {order_no}</h3>
-            <table>
-                <tr><th>항목</th><th>상태</th></tr>
-                <tr><td>스크린 제품 ({order_no})</td><td>최종 포장 및 출고 대기</td></tr>
-            </table>
-        </body>
-        </html>
-        """
-        # "invoice_printer" 라는 이름으로 설정된 프린터로 출력 전송
-        silent_print_html(invoice_html, "invoice_printer")
+    ###################
+    if new_stage == MAX_STAGE and delta > 0:
+        # 해당 주문번호에 딸린 전체 아이템 목록을 불러옴
+        cur.execute("SELECT barcode, fabric_type as fabric, width_mm, height_mm FROM order_items WHERE order_id=%s", (row["order_id"],))
+        items_db = cur.fetchall()
+        items_list = [{"barcode": i["barcode"], "fabric": i["fabric"], "size": f"W{i['width_mm']}xH{i['height_mm']}"} for i in items_db]
+        
+        html_content = render_shipping_slip(order_no=order_no, items=items_list)
+        silent_print_html(html_content, "invoice_printer")
     return worker_payload(row, pair_bc)
 
 
@@ -962,6 +941,9 @@ def admin_inv_issue(code: str, body: InvIssueIn, _=Depends(require_admin)):
             cur.execute("INSERT INTO inv_tx (code, serial, delta, reason, balance_after, worker) "
                         "VALUES (%s,%s,1,'issue',%s,%s)", (code, s, bal, body.worker))
         conn.commit()
+    for s in serials:
+        html_content = render_inventory_label(code=code, name=it["name"], serial=s, unit=it["unit"])
+        silent_print_html(html_content, "inventory_printer")
     return {"ok": True, "code": code, "name": it["name"], "unit": it["unit"],
             "serials": serials, "balance": bal}
 
