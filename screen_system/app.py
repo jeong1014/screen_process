@@ -266,7 +266,7 @@ def page_shop():
 
 @app.get("/shipping-slip/{barcode}")
 def page_shipping_slip(barcode: str):
-    # ハトメ完了時などに開く送り状(印刷)ページ。barcode から注文を引いて表示する。
+    # ハトメ完了時などに開く送_り状(印刷)ページ。barcode から注文を引いて表示する。
     return FileResponse(os.path.join(FRONTEND_DIR, "shipping_slip.html"))
 
 
@@ -431,13 +431,22 @@ def _move(order_no: str, delta: int):
         pair_bc = _pair_barcode(cur, row)
         conn.commit()
     ###################
-    if new_stage == MAX_STAGE and delta > 0:
-        # 해당 주문번호에 딸린 전체 아이템 목록을 불러옴
+    if new_stage == MAX_STAGE and step > 0:
+        print(f"📦 제품 {order_no} 최종 포장 완료 -> 송장 자동 출력 개시")
+        
+        # 1. 주문(고객) 정보 가져오기 (이 부분이 추가되었습니다!)
+        cur.execute("SELECT * FROM orders WHERE order_no=%s", (order_no,))
+        order_info = cur.fetchone() or {}
+        
+        # 2. 해당 주문에 포함된 전체 제품 목록 가져오기
         cur.execute("SELECT barcode, fabric_type as fabric, width_mm, height_mm FROM order_items WHERE order_id=%s", (row["order_id"],))
         items_db = cur.fetchall()
         items_list = [{"barcode": i["barcode"], "fabric": i["fabric"], "size": f"W{i['width_mm']}xH{i['height_mm']}"} for i in items_db]
         
-        html_content = render_shipping_slip(order_no=order_no, items=items_list)
+        # 3. 위에서 만든 템플릿에 데이터(order_info)를 넣어 HTML 생성
+        html_content = render_shipping_slip(order_no=order_no, order_info=order_info, items=items_list)
+        
+        # 4. 송장 프린터로 전송
         silent_print_html(html_content, "invoice_printer")
     return worker_payload(row, pair_bc)
 
