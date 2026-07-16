@@ -30,6 +30,12 @@ CREATE TYPE fabric_type    AS ENUM ('LN', 'DP', 'SDP');
 CREATE TYPE product_type   AS ENUM ('single', 'two_sheet_set', 'skirt');
 -- 各辺の加工: なし / ハトメ(eyelet) / スカート(skirt) / ベルクロ(velcro)
 CREATE TYPE process_kind   AS ENUM ('none', 'eyelet', 'skirt', 'velcro');
+-- 追加オプション(販売サイトの構成に合わせる): ベルクロ種別 / スカート取付方法 / ハトメ配置方式
+CREATE TYPE velcro_kind        AS ENUM ('male', 'female');
+CREATE TYPE skirt_attach_kind  AS ENUM ('sew', 'velcro');
+CREATE TYPE eyelet_method_kind AS ENUM ('A', 'B', 'C');
+-- 2枚セット(two_sheet_set)を表面/裏面の2枚に分けて管理する際の区分
+CREATE TYPE sheet_side_kind   AS ENUM ('front', 'back');
 CREATE TYPE scan_event_type AS ENUM ('start', 'complete', 'undo');
 CREATE TYPE print_target_type AS ENUM ('work_instruction', 'product_label', 'shipping_label', 'control_barcode');
 CREATE TYPE printer_type   AS ENUM ('brother_td4550', 'label', 'sato_cf408t', 'a4');
@@ -118,6 +124,17 @@ CREATE TABLE order_items (
 
     fire_cert_no  TEXT,
 
+    -- 2枚セット(two_sheet_set)は表面/裏面をそれぞれ独立した order_items 行として管理する
+    -- (裁断/ミシン/ハトメ/梱包を2回スキャンする必要があるため)。single/skirt では NULL。
+    sheet_side    sheet_side_kind,          -- 'front' または 'back'(2枚セットのみ)
+    pair_item_no  SMALLINT,                 -- 対になるもう片方の item_no(同一 order_id 内)
+
+    -- 販売サイトのオプション体系に合わせた追加項目
+    velcro_type      velcro_kind,
+    skirt_attachment skirt_attach_kind,
+    skirt_no_seam    BOOLEAN NOT NULL DEFAULT false,
+    eyelet_method    eyelet_method_kind,
+
     current_stage SMALLINT NOT NULL DEFAULT 0 REFERENCES production_stages(stage_no),
     started_at    TIMESTAMPTZ,
     completed_at  TIMESTAMPTZ,
@@ -165,15 +182,15 @@ CREATE TABLE accessories (
     name       TEXT NOT NULL,
     remain     INTEGER NOT NULL DEFAULT 0,
     capacity   INTEGER NOT NULL DEFAULT 10,
-    unit       TEXT NOT NULL DEFAULT '個',
+    unit       TEXT NOT NULL DEFAULT '箱',   -- 付属品の単位は全て「箱」に統一
     reorder_point INTEGER NOT NULL DEFAULT 5,
     sort_order SMALLINT NOT NULL DEFAULT 0
 );
 INSERT INTO accessories (name, remain, capacity, unit, sort_order) VALUES
     ('ハトメ',     8,  20, '箱', 1),
-    ('ウェビング', 3,  15, '巻', 2),
-    ('糸',         12, 30, '個', 3),
-    ('ベルクロ',   2,  10, '巻', 4);
+    ('ウェビング', 3,  15, '箱', 2),
+    ('糸',         12, 30, '箱', 3),
+    ('ベルクロ',   2,  10, '箱', 4);
 
 -- 入出庫履歴 / 設定 (管理者ページ)
 CREATE TABLE inventory_transactions (

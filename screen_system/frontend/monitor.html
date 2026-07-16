@@ -37,12 +37,14 @@
   .big .rmeta{font-size:20px;color:var(--sub);font-weight:800;margin-top:8px;}
   .fb{display:inline-block;font-weight:900;color:#04121f;border-radius:10px;padding:0 14px;}
 
-  /* 공정별 정보 (작업자 화면처럼 크게) */
+  /* 工程別情報(作業者画面のように大きく) */
   .pf{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 22px;margin-top:16px;width:100%;}
   .pf-item{background:rgba(255,255,255,.06);border-radius:16px;padding:16px 26px;min-width:200px;}
   .pf-k{font-size:24px;font-weight:800;color:var(--sub);}
   .pf-v{font-size:60px;font-weight:900;line-height:1.05;margin-top:4px;}
   .pf-v.none{color:#6f8aa3;}
+  /* ハトメモニターだけ: 配置方式(A/B)の参考図 */
+  .eyelet-diagram{background:rgba(255,255,255,.06);border-radius:16px;padding:10px 6px;margin-top:14px;width:100%;max-width:560px;}
 
   .right-col{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0;}
   .col{flex:1;background:var(--panel);border:2px solid #294056;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
@@ -63,7 +65,7 @@
 </head>
 <body>
 <header>
-  <div><span class="proc" id="procName">—</span> <span class="ko" id="procKo"></span> <span class="ko">モニター</span></div>
+  <div><span class="proc" id="procName">—</span> <span class="ko">モニター</span></div>
   <div class="right">
     <div class="kpi"><div class="v" id="qCount">0</div><div class="l">待機</div></div>
     <div class="kpi"><div class="v" style="color:var(--start)" id="wCount">0</div><div class="l">作業中</div></div>
@@ -89,18 +91,20 @@
   <span style="margin-left:auto" id="stime"></span>
 </div>
 
+<script src="/static/invhook.js"></script>
 <script>
 const PROC = location.pathname.split("/").filter(Boolean).pop();
 const REFRESH_MS = 3000;
 const esc = s => (s==null?"":String(s)).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
 const NONE = ["なし","無し","無","-","—",""];
+const RESULT_HOLD_MS = 15000;  // 完了/開始画面を表示し続ける時間(この後は自動でアイドル画面に戻る)
 let lastShownAt = 0;
+let initialShown = false;  // ページを開いた直後の1回だけ「最終結果」を表示するためのフラグ
 
 async function load(){
   try{
     const d = await fetch("/api/monitor/"+PROC).then(r=>r.json());
     document.getElementById("procName").textContent = d.name_ja;
-    document.getElementById("procKo").textContent = d.name_ko;
     document.getElementById("qCount").textContent = d.queue_count;
     document.getElementById("wCount").textContent = d.wip_count;
     document.getElementById("doneCount").textContent = d.today_done;
@@ -110,7 +114,17 @@ async function load(){
     renderList("queue", d.queue);
     renderList("wip", d.wip);
     document.title = d.name_ja+"モニター | CDI";
-    if(!lastShownAt){ if(d.last) showResult(d.last, "最終 "+d.last.at); else showIdle(); }
+    // 「big」表示はページを開いた直後の1回、またはスキャン直後(doScan側で表示済み)にのみ更新する。
+    // ここで毎回 d.last を再表示すると、15秒経ってアイドルに戻した直後にまた同じ結果が
+    // 表示されてしまい、いつまでも完了画面が固定されているように見えるため。
+    if(!lastShownAt && !initialShown){
+      initialShown = true;
+      // ★バグ修正: ここで lastShownAt を設定していなかったため、ページを開いた/更新した直後に
+      // d.last(直前の完了結果)が表示されると15秒タイマーが一度も起動せず、
+      // 再読み込みするたびに完了画面がずっと固定されたままになっていた。
+      if(d.last){ showResult(d.last, "最終 "+d.last.at); lastShownAt = Date.now(); }
+      else showIdle();
+    }
   }catch(e){}
 }
 function renderList(id, arr){
@@ -121,17 +135,46 @@ function renderList(id, arr){
       <span class="sz">${esc(x.size)}</span></div>`).join("")
     : `<div class="empty">なし</div>`;
 }
-// 결과+공정별 정보(작업자 화면처럼) 크게 표시
+/* ---- ハトメ配置方式(A/B)の参考図。実寸ではなく概念図(ピッチ表示のみ実際の値) ---- */
+function eyeletDiagramSVG(method, pitchMm){
+  const pitchLabel = pitchMm ? pitchMm+"mm" : "P";
+  if(method === "A"){
+    const xs = [0,110,220,330,440];
+    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
+      <text x="310" y="30" font-size="20" font-weight="800" fill="#38bdf8" text-anchor="middle">方式A・コーナー基準(ピッチ ${pitchLabel})</text>
+      <rect x="20" y="86" width="580" height="8" fill="#22384e" rx="4"/>
+      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#0d1b2a" stroke="#38bdf8" stroke-width="4"/>`).join("")}
+      <circle cx="600" cy="90" r="13" fill="#0d1b2a" stroke="#f59e0b" stroke-width="4"/>
+      <line x1="480" y1="90" x2="587" y2="90" stroke="#f59e0b" stroke-width="4" stroke-dasharray="8 7"/>
+      <text x="533" y="130" font-size="16" font-weight="800" fill="#f59e0b" text-anchor="middle">端数</text>
+      <text x="310" y="158" font-size="14" fill="#8aa6c0" text-anchor="middle">コーナーから ${pitchLabel} 間隔で順に配置 → 最後に端数が出る場合あり</text>
+    </svg>`;
+  }
+  if(method === "B"){
+    const xs = [0,116,232,348,464,580];
+    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
+      <text x="310" y="30" font-size="20" font-weight="800" fill="#22c55e" text-anchor="middle">方式B・間隔均等(基準ピッチ ${pitchLabel})</text>
+      <rect x="20" y="86" width="580" height="8" fill="#22384e" rx="4"/>
+      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#0d1b2a" stroke="#22c55e" stroke-width="4"/>`).join("")}
+      <text x="310" y="158" font-size="14" fill="#8aa6c0" text-anchor="middle">端から端まで等間隔になるようピッチを調整 → 端数は出ません</text>
+    </svg>`;
+  }
+  return `<div style="text-align:center;color:#8aa6c0;font-size:20px;font-weight:800;padding:20px 10px;line-height:1.6">配置方式(方式C)は現在未定です</div>`;
+}
+// 結果+工程別情報(作業者画面のように)大きく表示
 function showResult(o, extra){
   const cls = o.result==="完了" ? "ok" : "start";
   const fields = (o.fields||[]).map(f=>{
     const none = NONE.includes(String(f[1]).trim());
     return `<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v${none?' none':''}">${esc(none?'なし':f[1])}</div></div>`;
   }).join("");
+  // ハトメモニターだけ、スキャンしてから作業完了まで配置方式の参考図を表示し続ける
+  const diagram = (PROC === "eyelet")
+    ? `<div class="eyelet-diagram">${eyeletDiagramSVG(o.eyelet_method_code, o.eyelet_pitch_mm)}</div>` : "";
   const b=document.getElementById("big"); b.className="big "+cls;
   b.innerHTML=`<div class="res">${esc(o.result)}</div>
     <div class="bc"><span class="fb ${o.fabric}">${esc(o.fabric)}</span> ${esc(o.barcode)}</div>
-    <div class="pf">${fields}</div>${extra?`<div class="rmeta">${esc(extra)}</div>`:""}`;
+    <div class="pf">${fields}</div>${extra?`<div class="rmeta">${esc(extra)}</div>`:""}${diagram}`;
 }
 function showErr(o){
   const fields = (o.fields||[]).map(f=>`<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v">${esc(f[1])}</div></div>`).join("");
@@ -146,6 +189,8 @@ function showIdle(){
 }
 async function doScan(code){
   code=(code||"").trim(); if(!code) return;
+  // 在庫QRシリアル(例 11-00001)なら工程進行ではなく在庫消尽へ
+  if(window.InvScan && InvScan.isSerial(code)){ InvScan.consume(code); return; }
   try{
     const d = await fetch("/api/monitor/"+PROC+"/scan",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({barcode:code})}).then(r=>r.json());
@@ -154,15 +199,21 @@ async function doScan(code){
     load();
   }catch(e){ showErr({reason:"通信エラー"}); }
 }
-// 스캐너 = 키보드 입력 캡처(수동칸 제외)
+// スキャナー = キーボード入力キャプチャ(手動入力欄は除外)
 let buf="";
 document.addEventListener("keydown", e=>{
   if(e.target && e.target.id==="mbc") return;
   if(e.key==="Enter"){ if(buf.trim()) doScan(buf.trim()); buf=""; return; }
   if(e.key.length===1) buf += e.key;
 });
-setInterval(()=>{ if(lastShownAt && Date.now()-lastShownAt>7000){ lastShownAt=0; load(); } }, 1000);
-setInterval(()=>{ document.getElementById("clock").textContent=new Date().toLocaleTimeString(); },1000);
+setInterval(()=>{
+  if(lastShownAt && Date.now()-lastShownAt>RESULT_HOLD_MS){ lastShownAt=0; showIdle(); }
+}, 1000);
+setInterval(()=>{
+  const d = new Date();
+  document.getElementById("clock").textContent =
+    String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0");
+},1000);
 load(); setInterval(load, REFRESH_MS);
 </script>
 </body>

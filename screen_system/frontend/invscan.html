@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在庫QRスキャン — 消尽</title>
+<style>
+  :root{ --bg:#0f1b2d; --panel:#16273d; --line:#263a556e; --sub:#9fb2c8; --ok:#1fbf6b; --ng:#e5533c; --accent:#3d8bfd; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:#fff;
+    font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",Arial,sans-serif;}
+  .wrap{max-width:720px;margin:0 auto;padding:20px 16px 40px;}
+  h1{font-size:22px;margin:6px 0 2px;} .lead{color:var(--sub);font-size:13px;margin:0 0 16px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;}
+  label{display:block;font-size:12px;color:var(--sub);margin:0 0 6px;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+  input{background:#0c1728;border:1.5px solid #2b415f;border-radius:10px;color:#fff;padding:14px 14px;font-size:18px;}
+  #code{flex:1;min-width:240px;font-size:24px;font-weight:800;letter-spacing:1px;}
+  #worker{width:150px;}
+  .hint{font-size:12px;color:var(--sub);margin-top:8px;}
+  .result{border-radius:14px;padding:22px;text-align:center;display:none;margin-bottom:16px;}
+  .result.show{display:block;}
+  .result.ok{background:rgba(31,191,107,.14);border:1.5px solid var(--ok);}
+  .result.ng{background:rgba(229,83,60,.14);border:1.5px solid var(--ng);}
+  .result .big{font-size:30px;font-weight:900;margin:2px 0 6px;}
+  .result .name{font-size:22px;font-weight:800;}
+  .result .serial{font-size:15px;color:var(--sub);font-family:"Consolas",monospace;margin-top:4px;}
+  .result .bal{font-size:16px;color:var(--sub);margin-top:8px;}
+  .result .low{display:inline-block;margin-top:8px;background:var(--ng);color:#fff;font-weight:800;
+    font-size:13px;padding:3px 10px;border-radius:999px;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;}
+  th{color:var(--sub);font-weight:700;font-size:12px;}
+  td.s{font-family:"Consolas",monospace;} .muted{color:var(--sub);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>在庫QRスキャン <span class="muted" style="font-size:14px;">（消尽 / 出庫）</span></h1>
+  <p class="lead">発行済みのQR(製品番号 例 <b>11-00001</b>)を読み取ると、その1個を在庫から差し引きます。同じQRを再度読んでも二重差引はしません。</p>
+
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:240px">
+        <label>QR(製品番号)をスキャン / 手入力</label>
+        <input id="code" autocomplete="off" placeholder="ここにQRをスキャン…" autofocus>
+      </div>
+      <div>
+        <label>担当（任意）</label>
+        <input id="worker" placeholder="氏名">
+      </div>
+    </div>
+    <div class="hint">スキャナはコード末尾に Enter を送ります。読み取ると自動で消尽され、入力欄はクリアされます。</div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="big" id="rBig"></div>
+    <div class="name" id="rName"></div>
+    <div class="serial" id="rSerial"></div>
+    <div class="bal" id="rBal"></div>
+    <div id="rLow"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 8px;font-size:15px;">最近の消尽</h3>
+    <table><thead><tr><th style="width:80px">時刻</th><th style="width:110px">製品番号</th><th>品目</th><th style="width:80px">残</th></tr></thead>
+    <tbody id="log"><tr><td colspan="4" class="muted">まだありません</td></tr></tbody></table>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const codeEl = $("code");
+  let busy = false;
+
+  function showResult(ok, d){
+    const r = $("result");
+    r.className = "result show " + (ok ? "ok" : "ng");
+    if(ok){
+      $("rBig").textContent = "✓ 消尽 −1 " + (d.unit || "");
+      $("rName").textContent = d.name || "";
+      $("rSerial").textContent = d.serial || "";
+      $("rBal").textContent = "残り " + d.balance + " " + (d.unit || "");
+      $("rLow").innerHTML = d.low ? '<span class="low">要発注</span>' : "";
+    } else {
+      $("rBig").textContent = "✕ エラー";
+      $("rName").textContent = d.reason || "";
+      $("rSerial").textContent = d.serial || "";
+      $("rBal").textContent = "";
+      $("rLow").innerHTML = "";
+    }
+  }
+
+  function addLog(serial, name, bal, unit){
+    const tb = $("log");
+    if(tb.querySelector(".muted")) tb.innerHTML = "";
+    const t = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${t}</td><td class="s">${serial}</td><td>${name}</td><td>${bal} ${unit||""}</td>`;
+    tb.prepend(tr);
+    while(tb.children.length > 30) tb.removeChild(tb.lastChild);
+  }
+
+  async function submit(){
+    const code = codeEl.value.trim();
+    if(!code || busy) return;
+    busy = true;
+    const worker = $("worker").value.trim() || null;
+    try{
+      const res = await fetch("/api/inventory/scan",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ code, worker })
+      });
+      const d = await res.json();
+      showResult(!!d.ok, d);
+      if(d.ok) addLog(d.serial, d.name, d.balance, d.unit);
+    }catch(e){
+      showResult(false, {reason:"通信エラー: "+(e.message||e), serial:code});
+    }finally{
+      codeEl.value = "";
+      codeEl.focus();
+      busy = false;
+    }
+  }
+
+  codeEl.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); submit(); } });
+  document.addEventListener("click", () => codeEl.focus());
+  window.addEventListener("focus", () => codeEl.focus());
+</script>
+</body>
+</html>

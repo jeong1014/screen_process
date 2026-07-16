@@ -33,6 +33,7 @@
   th{color:var(--sub);font-weight:800;font-size:12px;position:sticky;top:0;background:#fff;}
   tr.click{cursor:pointer;} tr.click:hover{background:#f7f9fc;}
   .pill{font-size:11px;padding:2px 9px;border-radius:20px;background:#eef2f7;border:1px solid var(--line);font-weight:700;}
+  .pill.cancelled{background:var(--danger-bg);color:var(--danger);border-color:var(--danger);}
   .fb{font-weight:900;padding:2px 12px;border-radius:8px;color:#fff;font-size:13px;}
   .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);} .fb.ACC{background:var(--sub);}
   button.b{border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;}
@@ -80,7 +81,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TABS=[["orders","注文"],["inv","在庫"],["history","履歴"],["db","DB"]];
+const TABS=[["orders","注文"],["inv","在庫"],["po_req","発注依頼"],["po_sched","発注予定"],["ship","出荷"],["history","履歴"],["screens","画面"]];
+const PO_ST_CLS={requested:"warn",ordered:"pri",arrived:"ok",cancelled:"cancelled"};
+const SHIP_JA={ready:"出荷準備完了",label_printed:"送り状発行済",handed_to_sagawa:"佐川引渡し済",completed:"出荷完了"};
+const BIZ_JA={not_requested:"未連携",requested:"連携依頼中",issued:"発行済",failed:"失敗"};
 let PW=sessionStorage.getItem("adminpw")||"";
 const hdr=()=>({ "X-Admin-Pass":PW, "Content-Type":"application/json" });
 const esc=s=>(s==null?"":String(s)).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
@@ -107,6 +111,27 @@ function go(t){ [...document.querySelectorAll(".tabs button")].forEach(b=>b.clas
 if(PW){ document.getElementById("gate").style.display="none"; boot(); }
 function closeModal(){ document.getElementById("modal").style.display="none"; }
 const RENDER={};
+
+// ===== 画面ランチャー(作業者/モニター等を別タブで開く) =====
+RENDER.screens=()=>{
+  const scr=[
+    ["/monitor/cutting","裁断モニター","裁断ステーション表示+スキャン","#0891b2"],
+    ["/monitor/sewing","ミシンモニター","ミシンステーション表示+スキャン","#0891b2"],
+    ["/monitor/eyelet","ハトメモニター","ハトメステーション表示+スキャン","#0891b2"],
+    ["/dashboard","ダッシュボード","全体の進捗ボード","#16a34a"],
+    ["/input","注文入力","手動で注文を登録","#6b7280"],
+  ];
+  const card=([u,t,d,c])=>`<a href="${u}" target="_blank"
+      style="display:block;padding:16px;border:1px solid #dfe5ec;border-left:5px solid ${c};border-radius:12px;
+             text-decoration:none;color:inherit;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="font-size:17px;font-weight:800">${t} <span style="font-weight:600;opacity:.5">↗</span></div>
+      <div class="muted" style="font-size:13px;margin-top:3px">${d}</div>
+      <div class="muted" style="font-size:12px;margin-top:6px;font-family:Consolas,monospace">${u}</div></a>`;
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>画面を開く</h2>
+    <div class="muted" style="margin:-4px 0 12px;font-size:12px">別タブで開きます。各工程のモニターに全画面表示してください。在庫QR(例 11-00001)は各モニター画面でもスキャンで消尽できます。</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px">
+      ${scr.map(card).join("")}</div></div>`;
+};
 
 function printTable(title, headers, rows){
   const w=window.open("","_blank");
@@ -147,7 +172,7 @@ async function loadOrders(){
       <tr><th>注文番号</th><th>受注日時</th><th>チャネル</th><th>顧客</th><th>決済</th><th>状態</th><th>明細</th><th>進行(最小)</th></tr>
       ${d.map(o=>`<tr class="click" onclick="orderDetail('${o.order_no}')">
         <td><b>${esc(o.order_no)}</b></td><td>${esc(o.ordered_at)}</td><td><span class="pill">${esc(o.channel)}</span></td>
-        <td>${esc(o.customer_name)}</td><td>${esc(o.payment_status)}</td><td><span class="pill">${esc(o.order_status)}</span></td>
+        <td>${esc(o.customer_name)}</td><td>${esc(o.payment_status)}</td><td><span class="pill ${o.order_status==='cancelled'?'cancelled':''}">${esc(o.order_status)}</span></td>
         <td>${o.items}</td><td>${esc(o.min_stage_name)}</td></tr>`).join("")}</table></div>`
       :`<div class="muted">該当なし</div>`;
   }catch(e){ document.getElementById("ordBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
@@ -163,7 +188,14 @@ async function orderDetail(no){
       <td><a class="b b-gray" href="/label/${encodeURIComponent(it.barcode)}?print=1" target="_blank" style="text-decoration:none">🖨 ラベル</a></td></tr>`).join("");
     const scans=d.scans.length?`<div class="scroll" style="max-height:200px"><table><tr><th>時刻</th><th>製品</th><th>工程</th><th>種別</th></tr>${
       d.scans.map(s=>`<tr><td>${esc(s.t)}</td><td>${esc(s.barcode)}</td><td>${esc(s.stage_name)}</td><td>${esc(s.event)}</td></tr>`).join("")}</table></div>`:`<div class="muted">スキャン履歴なし</div>`;
-    const ships=d.shipments.length?d.shipments.map(s=>`送り状 ${esc(s.tracking_no||'—')} / ${esc(s.shipping_status)} / ${esc(s.bizlogi_status)}`).join("<br>"):`<span class="muted">なし</span>`;
+    const ship=d.shipments[0]||{};
+    const shipForm=`<div class="row">
+        <div><label class="f">追跡番号</label><input id="sh_tracking" value="${esc(ship.tracking_no||'')}" placeholder="佐川の伝票番号" style="width:170px"></div>
+        <div><label class="f">配送状況</label><select id="sh_status">${['ready','label_printed','handed_to_sagawa','completed'].map(x=>`<option value="${x}" ${x===ship.shipping_status?'selected':''}>${SHIP_JA[x]}</option>`).join("")}</select></div>
+        <div><label class="f">BizLogi連携</label><select id="sh_bizlogi">${['not_requested','requested','issued','failed'].map(x=>`<option value="${x}" ${x===ship.bizlogi_status?'selected':''}>${BIZ_JA[x]}</option>`).join("")}</select></div>
+        <div><label class="f">個口数</label><input id="sh_pkg" type="number" min="1" value="${ship.package_count||1}" style="width:70px"></div>
+        <button class="b b-pri" onclick="saveShipment('${esc(o.order_no)}')">出荷情報を保存</button>
+      </div>${ship.shipment_no?`<div class="muted" style="margin-top:8px">送り状番号: ${esc(ship.shipment_no)}</div>`:`<div class="muted" style="margin-top:8px">まだ出荷レコードがありません。保存すると新規作成されます。</div>`}`;
     document.getElementById("modalBody").innerHTML=`
       <div style="display:flex;align-items:center"><h2 style="margin:0;flex:1">${esc(o.order_no)}</h2><button class="b b-gray" onclick="closeModal()">閉じる</button></div>
       <div class="row" style="margin:14px 0">
@@ -178,7 +210,7 @@ async function orderDetail(no){
       </div>
       <h3>明細(工程で補正 / ラベル再印刷)</h3><div class="scroll" style="max-height:260px"><table>
         <tr><th>バーコード</th><th>生地</th><th>サイズ</th><th>商品</th><th>加工</th><th>工程</th><th></th></tr>${items}</table></div>
-      <h3>スキャン履歴</h3>${scans}<h3>出荷</h3>${ships}`;
+      <h3>スキャン履歴</h3>${scans}<h3>出荷</h3>${shipForm}`;
     document.getElementById("modal").style.display="flex";
   }catch(e){ alert(e.message); }
 }
@@ -199,64 +231,260 @@ async function fixStage(bc,stage){
   try{ await api("/api/admin/items/"+encodeURIComponent(bc)+"/stage",{method:"PATCH",body:JSON.stringify({stage:parseInt(stage,10)})}); toast("工程を補正"); }
   catch(e){ alert(e.message); }
 }
+async function saveShipment(orderNo){
+  const g=id=>document.getElementById(id).value;
+  try{
+    await api("/api/admin/shipments",{method:"POST",body:JSON.stringify({
+      order_no:orderNo,
+      tracking_no:g("sh_tracking")||null,
+      shipping_status:g("sh_status"),
+      bizlogi_status:g("sh_bizlogi"),
+      package_count:parseInt(g("sh_pkg"),10)||1,
+    })});
+    toast("出荷情報を保存しました");
+    orderDetail(orderNo);
+  }catch(e){ alert(e.message); }
+}
 
-// ===== 在庫 =====
+// ===== 出荷一覧 =====
+RENDER.ship=()=>{
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>出荷一覧</h2>
+    <div id="shipBody" class="muted">読み込み中...</div></div>`;
+  loadShipments();
+};
+async function loadShipments(){
+  try{
+    const d=await api("/api/admin/shipments");
+    document.getElementById("shipBody").innerHTML=d.length?`<div class="scroll"><table>
+      <tr><th>注文番号</th><th>顧客</th><th>送り状番号</th><th>追跡番号</th><th>配送状況</th><th>BizLogi</th><th>個口</th></tr>
+      ${d.map(s=>`<tr class="click" onclick="orderDetail('${esc(s.order_no)}')">
+        <td><b>${esc(s.order_no)}</b></td><td>${esc(s.customer_name)}</td><td>${esc(s.shipment_no)}</td>
+        <td>${esc(s.tracking_no||'—')}</td><td><span class="pill">${esc(SHIP_JA[s.shipping_status]||s.shipping_status)}</span></td>
+        <td><span class="pill">${esc(BIZ_JA[s.bizlogi_status]||s.bizlogi_status)}</span></td><td>${s.package_count}</td></tr>`).join("")}</table></div>`
+      :`<div class="muted">出荷データなし</div>`;
+  }catch(e){ document.getElementById("shipBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+
+// ===== 在庫 (品目コード + シリアルQR) =====
 RENDER.inv=async ()=>{
   const M=document.getElementById("main");
-  M.innerHTML=`<div class="panel"><h2>在庫管理</h2><div id="invBody" class="muted">読み込み中...</div></div>
-    <div class="panel"><h2>付属品の種類を追加</h2>
+  M.innerHTML=`<div class="panel"><h2>在庫管理 <a class="b b-pri" href="/invscan" target="_blank" style="text-decoration:none;float:right">📷 QRスキャンで消尽</a></h2>
+    <div class="muted" style="margin:-4px 0 10px;font-size:12px">「🏷 QR発行(入庫)」で製品番号(コード-連番, 例 11-00001)を採番してラベル印刷し在庫+1。現場でそのQRをスキャンすると-1(消尽)。同じQRの二重差引はしません。</div>
+    <div id="invBody" class="muted">読み込み中...</div></div>
+    <div class="panel"><h2>品目を追加</h2>
       <div class="row">
-        <div><label class="f">名称</label><input id="acName" placeholder="ハトメ 等"></div>
-        <div><label class="f">単位</label><input id="acUnit" value="個" style="width:70px"></div>
-        <div><label class="f">容量</label><input id="acCap" type="number" value="10" style="width:80px"></div>
-        <div><label class="f">発注点</label><input id="acRe" type="number" value="5" style="width:80px"></div>
-        <button class="b b-pri" onclick="addAcc()">追加</button>
+        <div><label class="f">コード</label><input id="niCode" placeholder="62 等" style="width:70px"></div>
+        <div><label class="f">区分</label><select id="niCat"><option value="accessory">付属品</option><option value="fabric">原反</option></select></div>
+        <div><label class="f">グループNo</label><input id="niGroup" type="number" value="6" style="width:70px"></div>
+        <div><label class="f">グループ名</label><input id="niGname" placeholder="カバー 等" style="width:120px"></div>
+        <div style="flex:1;min-width:160px"><label class="f">品名</label><input id="niName" placeholder="品名" style="width:100%"></div>
+        <div><label class="f">単位</label><input id="niUnit" value="箱" style="width:64px"></div>
+        <button class="b b-pri" onclick="addItem()">追加</button>
       </div></div>`;
   loadInv();
 };
 async function loadInv(){
   try{
-    const d=await api("/api/admin/inventory");
+    const d=await api("/api/admin/inv");
     const rowHtml=it=>{
-      const pct=Math.max(2,Math.round(it.remain/it.cap*100));
-      const del=it.kind==='accessory'?`<button class="b b-danger" onclick="delAcc(${it.id},'${esc(it.name)}')">削除</button>`:'';
+      const pct=Math.max(2,Math.round(it.remain/Math.max(1,it.cap)*100));
+      const badge=it.fabric_type||'ACC';
       return `<tr>
-        <td><span class="fb ${it.kind==='fabric'?it.name:'ACC'}">${esc(it.name)}</span></td>
-        <td style="width:34%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>
+        <td style="white-space:nowrap"><span class="fb ${badge}">${esc(it.code)}</span> ${esc(it.name)}</td>
+        <td style="width:24%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>
         <td><b>${it.remain}</b> <span class="muted">/ ${it.cap} ${esc(it.unit)}</span> ${it.low?'<span class="low-txt">要発注</span>':''}</td>
-        <td class="muted">発注点 <input type="number" value="${it.reorder}" style="width:56px" onchange="setReorder('${it.kind}','${it.id}',this.value)"></td>
+        <td class="muted">発注点 <input type="number" value="${it.reorder}" style="width:52px" onchange="setReorderInv('${it.code}',this.value)"></td>
         <td>
-          <button class="b b-ok" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',1)">＋入庫</button>
-          <button class="b b-warn" onclick="adjust('${it.kind}','${it.id}','${esc(it.name)}',-1)">−消尽</button>
-          ${del}
+          <button class="b b-ok" onclick="issueQR('${it.code}','${esc(it.name)}')">🏷 QR発行(入庫)</button>
+          <button class="b b-gray" onclick="adjustInv('${it.code}','${esc(it.name)}')">補正</button>
+          <button class="b b-danger" onclick="delItem('${it.code}','${esc(it.name)}')">削除</button>
         </td></tr>`;
     };
-    document.getElementById("invBody").innerHTML=
-      `<h3>生地(ロール)</h3><table>${d.fabric.map(rowHtml).join("")}</table>
-       <h3>付属品</h3><table>${d.accessories.map(rowHtml).join("")||'<tr><td class="muted">なし</td></tr>'}</table>`;
+    let html="";
+    for(const g of (d.groups||[])){
+      const rows=(d.items||[]).filter(x=>x.group_no===g.no);
+      if(!rows.length) continue;
+      html+=`<h3>${g.no}. ${esc(g.name)}</h3><table>${rows.map(rowHtml).join("")}</table>`;
+    }
+    document.getElementById("invBody").innerHTML=html||'<div class="muted">品目がありません。migrate_inventory_v2.py を実行してください。</div>';
   }catch(e){ document.getElementById("invBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
 }
-async function adjust(kind,id,name,sign){
-  const q=prompt(name+" の"+(sign>0?"入庫":"消尽")+"数量","1"); if(q===null)return;
-  const n=Math.abs(parseInt(q,10)||0); if(!n)return;
-  const note=prompt("メモ(任意)","")||null;
-  try{ await api("/api/admin/inventory/adjust",{method:"POST",body:JSON.stringify({kind,id,delta:sign*n,reason:sign>0?'in':'out',note})}); toast("反映しました"); loadInv(); }
-  catch(e){ alert(e.message); }
-}
-async function setReorder(kind,id,v){
-  try{ await api("/api/admin/inventory/reorder",{method:"POST",body:JSON.stringify({kind,id,reorder_point:parseInt(v,10)||0})}); toast("発注点を更新"); }
-  catch(e){ alert(e.message); }
-}
-async function addAcc(){
-  const g=id=>document.getElementById(id).value;
-  if(!g("acName")){ alert("名称を入力"); return; }
-  try{ await api("/api/admin/accessories",{method:"POST",body:JSON.stringify({name:g("acName"),unit:g("acUnit")||"個",capacity:parseInt(g("acCap"),10)||10,reorder_point:parseInt(g("acRe"),10)||5})});
-    document.getElementById("acName").value=""; toast("追加しました"); loadInv();
+// QR発行 = 入庫(+枚数)。採番したシリアルをラベル印刷。
+async function issueQR(code,name){
+  const q=prompt(name+" のQR発行枚数(= 入庫数)","1"); if(q===null)return;
+  const n=Math.max(1,parseInt(q,10)||1);
+  try{
+    const r=await api(`/api/admin/inv/${code}/issue`,{method:"POST",body:JSON.stringify({count:n})});
+    toast(`発行 ${r.serials.length}枚 / 在庫 ${r.balance}`); loadInv();
+    window.open(`/invlabel/_?serials=${encodeURIComponent(r.serials.join(","))}&print=1`,"_blank");
   }catch(e){ alert(e.message); }
 }
-async function delAcc(id,name){
-  if(!confirm(name+" を削除しますか?(在庫履歴も消えます)")) return;
-  try{ await api("/api/admin/accessories/"+id,{method:"DELETE"}); toast("削除しました"); loadInv(); }
+// 手動補正(棚卸差異など)。+入庫 / −消尽。
+async function adjustInv(code,name){
+  const q=prompt(name+" の手動補正 (+入庫 / −消尽, 例 -1)","-1"); if(q===null)return;
+  const dv=parseInt(q,10)||0; if(!dv)return;
+  const note=prompt("メモ(任意)","")||null;
+  try{ await api(`/api/admin/inv/${code}/adjust`,{method:"POST",body:JSON.stringify({delta:dv,note})}); toast("反映しました"); loadInv(); }
+  catch(e){ alert(e.message); }
+}
+async function setReorderInv(code,v){
+  try{ await api(`/api/admin/inv/${code}/reorder`,{method:"POST",body:JSON.stringify({reorder_point:parseInt(v,10)||0})}); toast("発注点を更新"); }
+  catch(e){ alert(e.message); }
+}
+async function delItem(code,name){
+  if(!confirm(name+" ("+code+") を無効化しますか?(在庫履歴は保持されます)")) return;
+  try{ await api("/api/admin/inv/item/"+code,{method:"DELETE"}); toast("削除しました"); loadInv(); }
+  catch(e){ alert(e.message); }
+}
+async function addItem(){
+  const g=id=>document.getElementById(id).value.trim();
+  const code=g("niCode"), name=g("niName"); if(!code||!name){ alert("コードと品名を入力"); return; }
+  const cat=g("niCat");
+  try{ await api("/api/admin/inv/item",{method:"POST",body:JSON.stringify({
+      code, name, category:cat, group_no:parseInt(g("niGroup"),10)||6,
+      group_name:g("niGname")||"その他", unit:g("niUnit")||(cat==='fabric'?'ロール':'箱')})});
+    document.getElementById("niName").value=""; document.getElementById("niCode").value="";
+    toast("追加しました"); loadInv();
+  }catch(e){ alert(e.message); }
+}
+
+// ===== 発注依頼 (品目ごとに必要数を入力 → 資材部へメール) =====
+RENDER.po_req=async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>発注依頼</h2>
+    <div class="muted" style="margin:-4px 0 10px;font-size:12px">品目ごとに必要数を入れて「依頼」を押すと、資材部にメールが届きます。到着予定日は資材部が「発注予定」タブに入力します。<span class="low-txt">要発注</span>=在庫が発注点以下。</div>
+    <div class="row" style="margin-bottom:12px">
+      <div><label class="f">依頼者(任意)</label><input id="poBy" placeholder="お名前 / 端末名" style="width:160px"></div>
+      <button class="b b-gray" onclick="toggleMail()">✉ メール設定</button>
+    </div>
+    <div id="poMail" style="display:none"></div>
+    <div id="poReqBody" class="muted">読み込み中...</div></div>`;
+  loadPoReq();
+};
+async function loadPoReq(){
+  try{
+    const d=await api("/api/admin/inv");
+    const rowHtml=it=>`<tr>
+        <td style="white-space:nowrap"><span class="fb ${it.fabric_type||'ACC'}">${esc(it.code)}</span> ${esc(it.name)}</td>
+        <td class="muted">在庫 <b style="color:${it.low?'var(--danger)':'var(--text)'}">${it.remain}</b>/${it.cap} ${esc(it.unit)} ${it.low?'<span class="low-txt">要発注</span>':''}</td>
+        <td><input type="number" min="1" value="${Math.max(1,it.reorder||1)}" id="poq_${it.code}" style="width:72px"> ${esc(it.unit)}</td>
+        <td><button class="b b-pri" onclick="sendPoReq('${it.code}')">依頼</button></td></tr>`;
+    let html="";
+    for(const g of (d.groups||[])){
+      const rows=(d.items||[]).filter(x=>x.group_no===g.no);
+      if(!rows.length) continue;
+      html+=`<h3>${g.no}. ${esc(g.name)}</h3><table>${rows.map(rowHtml).join("")}</table>`;
+    }
+    document.getElementById("poReqBody").innerHTML=html||'<div class="muted">品目がありません。</div>';
+  }catch(e){ document.getElementById("poReqBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function sendPoReq(code){
+  const qty=parseInt(document.getElementById("poq_"+code).value,10)||0;
+  if(qty<1){ alert("必要数を入力してください"); return; }
+  const by=document.getElementById("poBy").value.trim()||null;
+  try{
+    const r=await api("/api/admin/purchase",{method:"POST",body:JSON.stringify({code,qty,requested_by:by})});
+    toast(r.emailed?"依頼しました(メール送信済)":"依頼しました("+(r.email_message||"メール未設定")+")");
+  }catch(e){ alert(e.message); }
+}
+let MAIL_OPEN=false;
+async function toggleMail(){
+  const box=document.getElementById("poMail");
+  MAIL_OPEN=!MAIL_OPEN; box.style.display=MAIL_OPEN?"block":"none";
+  if(!MAIL_OPEN) return;
+  box.innerHTML=`<div class="muted">読み込み中...</div>`;
+  try{
+    const c=await api("/api/admin/purchase/settings");
+    box.innerHTML=`<div class="panel" style="background:#f7f9fc">
+      <h3 style="margin-top:0">✉ 資材部メール / SMTP 設定</h3>
+      <div class="row">
+        <div style="flex:1;min-width:220px"><label class="f">資材部の宛先(カンマ区切りで複数可)</label><input id="mTo" value="${esc(c.to)}" style="width:100%" placeholder="shizai@example.com"></div>
+        <div><label class="f">SMTPホスト</label><input id="mHost" value="${esc(c.host)}" placeholder="smtp.gmail.com"></div>
+        <div><label class="f">ポート</label><input id="mPort" value="${esc(c.port)}" style="width:70px"></div>
+        <div><label class="f">暗号化</label><select id="mTls">${['starttls','ssl','none'].map(x=>`<option ${x===c.tls?'selected':''}>${x}</option>`).join("")}</select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label class="f">ユーザー(ログイン)</label><input id="mUser" value="${esc(c.user)}" placeholder="送信元アドレス"></div>
+        <div><label class="f">パスワード ${c.pass_set?'<span class="muted">(設定済・変更時のみ入力)</span>':''}</label><input id="mPass" type="password" placeholder="${c.pass_set?'••••••':'アプリパスワード等'}"></div>
+        <div style="flex:1;min-width:180px"><label class="f">差出人(空ならユーザー)</label><input id="mFrom" value="${esc(c.from)}" style="width:100%"></div>
+        <button class="b b-pri" onclick="saveMail()">保存</button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:8px">Gmailの場合: ホスト smtp.gmail.com / ポート 587 / starttls / パスワードは「アプリパスワード」。</div>
+    </div>`;
+  }catch(e){ box.innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function saveMail(){
+  const g=id=>document.getElementById(id).value;
+  try{
+    await api("/api/admin/purchase/settings",{method:"POST",body:JSON.stringify({
+      to:g("mTo"),host:g("mHost"),port:g("mPort"),tls:g("mTls"),
+      user:g("mUser"),password:g("mPass"),from:g("mFrom")})});
+    toast("メール設定を保存しました"); document.getElementById("mPass").value="";
+  }catch(e){ alert(e.message); }
+}
+
+// ===== 発注予定 (資材部が到着予定日を入力 / 全員が確認) =====
+RENDER.po_sched=()=>{
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>発注予定</h2>
+    <div class="muted" style="margin:-4px 0 10px;font-size:12px">依頼中の品目に資材部が到着予定日を入力すると「発注済」になります。届いたら「入荷」を押してください。</div>
+    <div class="row" style="margin-bottom:12px">
+      <div class="seg" id="poSeg">
+        <button class="on" onclick="setPoFilter('')">全部</button>
+        <button onclick="setPoFilter('requested')">依頼中</button>
+        <button onclick="setPoFilter('ordered')">発注済</button>
+        <button onclick="setPoFilter('arrived')">入荷済</button>
+      </div>
+      <button class="b b-gray" onclick="loadPoSched()">🔄 更新</button>
+    </div>
+    <div id="poSchedBody" class="muted">読み込み中...</div></div>`;
+  loadPoSched();
+};
+let PO_FILTER="";
+function setPoFilter(s){
+  PO_FILTER=s;
+  [...document.querySelectorAll("#poSeg button")].forEach(b=>b.classList.remove("on"));
+  event.target.classList.add("on");
+  loadPoSched();
+}
+async function loadPoSched(){
+  try{
+    const d=await api("/api/admin/purchase"+(PO_FILTER?"?status="+PO_FILTER:""));
+    const badge=r=>`<span class="pill ${r.status==='cancelled'?'cancelled':''}" style="${r.status==='ordered'?'background:#e7f0fb;border-color:var(--accent);color:var(--accent)':r.status==='arrived'?'background:#e6f6ee;border-color:var(--ok);color:var(--ok)':r.status==='requested'?'background:var(--warn-bg);border-color:var(--warn);color:var(--warn)':''}">${esc(r.status_ja)}</span>`;
+    const actions=r=>{
+      if(r.status==='requested')
+        return `<input type="date" id="eta_${r.id}" style="width:150px"> <button class="b b-pri" onclick="setEta(${r.id})">発注登録</button> <button class="b b-danger" onclick="poCancel(${r.id})">取消</button>`;
+      if(r.status==='ordered')
+        return `<input type="date" id="eta_${r.id}" value="${r.eta}" style="width:150px"> <button class="b b-gray" onclick="setEta(${r.id})">予定日変更</button> <button class="b b-ok" onclick="poArrive(${r.id})">入荷</button>`;
+      return '<span class="muted">—</span>';
+    };
+    document.getElementById("poSchedBody").innerHTML=d.length?`<div class="scroll"><table>
+      <tr><th>依頼日時</th><th>コード</th><th>品名</th><th>数量</th><th>状態</th><th>到着予定</th><th>依頼者</th><th>メール</th><th>操作</th></tr>
+      ${d.map(r=>`<tr>
+        <td>${esc(r.requested_at)}</td>
+        <td><b>${esc(r.code)}</b></td><td>${esc(r.name)}</td>
+        <td><b>${r.qty}</b> ${esc(r.unit)}</td>
+        <td>${badge(r)}</td>
+        <td>${r.eta?'<b>'+esc(r.eta)+'</b>':'<span class="muted">未定</span>'}</td>
+        <td>${esc(r.requested_by||'-')}</td>
+        <td>${r.emailed?'<span class="muted">送信済</span>':'<span class="low-txt">未送信</span>'}</td>
+        <td>${actions(r)}</td></tr>`).join("")}</table></div>`
+      :`<div class="muted">発注データなし</div>`;
+  }catch(e){ document.getElementById("poSchedBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+}
+async function setEta(id){
+  const eta=document.getElementById("eta_"+id).value;
+  if(!eta){ alert("到着予定日を選択してください"); return; }
+  try{ await api("/api/admin/purchase/"+id+"/order",{method:"POST",body:JSON.stringify({eta})}); toast("到着予定日を登録しました"); loadPoSched(); }
+  catch(e){ alert(e.message); }
+}
+async function poArrive(id){
+  if(!confirm("入荷済にしますか?")) return;
+  try{ await api("/api/admin/purchase/"+id+"/arrive",{method:"POST"}); toast("入荷済にしました"); loadPoSched(); }
+  catch(e){ alert(e.message); }
+}
+async function poCancel(id){
+  if(!confirm("この依頼を取消しますか?")) return;
+  try{ await api("/api/admin/purchase/"+id+"/cancel",{method:"POST"}); toast("取消しました"); loadPoSched(); }
   catch(e){ alert(e.message); }
 }
 
@@ -284,11 +512,8 @@ function setHMode(m){
   const F=document.getElementById("hFilter");
   if(m==="inv"){
     F.innerHTML=`<div class="row" style="margin-bottom:12px">
-      <div><label class="f">期間</label><input id="hdf" type="date"> ~ <input id="hdt" type="date"></div>
-      <div><label class="f">対象種別</label><select id="hkind"><option value="">全部</option><option value="fabric">生地</option><option value="accessory">付属品</option></select></div>
-      <div><label class="f">区分</label><select id="hreason"><option value="">全部</option><option value="in">入庫</option><option value="out">消尽</option><option value="adjust">調整</option></select></div>
+      <div class="muted" style="font-size:12px">発行(入庫)・消尽・調整の履歴(最新順)</div>
       <button class="b b-pri" onclick="loadHistory()">照会</button>
-      <button class="b b-ok" onclick="csvHistory()">CSV</button>
       <button class="b b-gray" onclick="printHistory()">🖨 印刷</button>
     </div>`;
   }else{
@@ -315,12 +540,13 @@ async function loadHistory(){
   const p=histParams();
   try{
     if(HMODE==="inv"){
-      const d=await api("/api/admin/inventory/history?"+p.toString()); HROWS=d;
+      const d=await api("/api/admin/inv/history"); HROWS=d;
       document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件</div><div class="scroll"><table>
-        <tr><th>日時</th><th>対象</th><th>区分</th><th>増減</th><th>残</th><th>メモ</th><th>担当</th></tr>
-        ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.target)}</td><td><span class="pill">${REASON_JA[x.reason]||x.reason}</span></td>
+        <tr><th>日時</th><th>コード</th><th>品名</th><th>製品番号</th><th>区分</th><th>増減</th><th>残</th><th>担当</th></tr>
+        ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.code)}</td><td>${esc(x.name||'')}</td><td>${esc(x.serial||'')}</td>
+          <td><span class="pill">${esc(x.reason)}</span></td>
           <td style="color:${x.delta<0?'var(--danger)':'var(--ok)'}"><b>${x.delta>0?'+':''}${x.delta}</b></td>
-          <td>${x.balance==null?'':x.balance}</td><td class="muted">${esc(x.note||'')}</td><td>${esc(x.worker||'')}</td></tr>`).join("")}</table></div>`
+          <td>${x.balance==null?'':x.balance}</td><td>${esc(x.worker||'')}</td></tr>`).join("")}</table></div>`
         :`<div class="muted">履歴なし</div>`;
     }else{
       const d=await api("/api/admin/scans?"+p.toString()); HROWS=d;
@@ -334,14 +560,15 @@ async function loadHistory(){
 }
 function csvHistory(){
   const p=histParams(); p.set("pw",PW);
-  const url=(HMODE==="inv"?"/api/admin/inventory/history.csv?":"/api/admin/scans.csv?")+p.toString();
+  if(HMODE==="inv"){ alert("在庫履歴のCSVは未対応です(印刷をご利用ください)"); return; }
+  const url="/api/admin/scans.csv?"+p.toString();
   window.open(url,"_blank");
 }
 function printHistory(){
   if(!HROWS.length){ alert("印刷する行がありません"); return; }
   if(HMODE==="inv"){
-    printTable("入出庫履歴",["日時","対象","区分","増減","残","メモ","担当"],
-      HROWS.map(x=>[x.t,x.target,REASON_JA[x.reason]||x.reason,(x.delta>0?"+":"")+x.delta,x.balance,x.note||"",x.worker||""]));
+    printTable("在庫履歴(発行/消尽/調整)",["日時","コード","品名","製品番号","区分","増減","残","担当"],
+      HROWS.map(x=>[x.t,x.code,x.name||"",x.serial||"",x.reason,(x.delta>0?"+":"")+x.delta,x.balance,x.worker||""]));
   }else{
     printTable("生産スキャン履歴",["日時","バーコード","注文番号","工程","種別","端末"],
       HROWS.map(x=>[x.t,x.barcode,x.order_no,x.stage_name,x.event,x.station||""]));

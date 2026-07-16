@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>注文入力 / 주문 입력</title>
+<title>注文入力</title>
 <style>
   :root{
     --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0;
@@ -33,22 +33,22 @@
 </style>
 </head>
 <body>
-  <h1>注文入力 <span style="color:var(--muted);font-size:14px">주문 입력</span></h1>
-  <div class="sub">고객 + 명세를 손으로 입력 → 저장하면 DB에 들어가고 작업자화면·대시보드에 반영됩니다.</div>
+  <h1>注文入力</h1>
+  <div class="sub">お客様情報+明細を手入力 → 保存するとDBに登録され、作業者画面・ダッシュボードに反映されます。</div>
   <div class="nav">
-    <a href="/worker" target="_blank">▶ 作業者画面(작업자화면)</a>
-    <a href="/dashboard" target="_blank">▶ ダッシュボード(대시보드)</a>
+    <a href="/worker" target="_blank">▶ 作業者画面</a>
+    <a href="/dashboard" target="_blank">▶ ダッシュボード</a>
   </div>
 
   <div class="panel">
-    <h3 style="margin-top:0">お客様情報 / 고객정보</h3>
+    <h3 style="margin-top:0">お客様情報</h3>
     <div class="grid g3">
       <div><label>販売チャネル</label>
         <select id="channel">
           <option value="rakuten">rakuten</option>
           <option value="amazon">amazon</option>
           <option value="yahoo">yahoo</option>
-          <option value="base_ec">base_ec (자사)</option>
+          <option value="base_ec">base_ec (自社)</option>
         </select></div>
       <div><label>お客様名</label><input id="customer_name" placeholder="山田太郎"></div>
       <div><label>決済状態</label>
@@ -69,27 +69,40 @@
   </div>
 
   <div class="panel">
-    <h3 style="margin-top:0">明細 / 명세 <span style="color:var(--muted);font-size:12px">(작업지시서·라벨 1장 단위)</span></h3>
+    <h3 style="margin-top:0">明細 <span style="color:var(--muted);font-size:12px">(作業指示書・ラベル1枚単位)</span></h3>
     <div id="items"></div>
-    <button class="btn-add" onclick="addItem()">＋ 明細追加 / 명세 추가</button>
+    <button class="btn-add" onclick="addItem()">＋ 明細追加</button>
   </div>
 
-  <button class="btn-sub" onclick="submitOrder()">💾 注文を保存 / 주문 저장</button>
+  <button class="btn-sub" onclick="submitOrder()">💾 注文を保存</button>
   <div class="panel" id="resultPanel" style="display:none"><div id="result"></div></div>
 
 <script>
   // ===== 設定 =====
-  const API_BASE = "";  // 같은 서버에서 서빙되면 빈 값. 다른 곳이면 "http://localhost:8000"
-  const PROC = ["none","eyelet","skirt","velcro"];  // なし/ハトメ/スカート/ベルクロ
+  const API_BASE = "";  // 同じサーバーから配信されるなら空値。別の場所なら "http://localhost:8000"
+  // ベルクロは全製品に必ず付くため、辺の加工選択からは外す(なし/ハトメ/スカートのみ)
+  const PROC = [["none","なし"],["eyelet","ハトメ"],["skirt","スカート"]];
+  const EYELET_MM = ["", "300", "200", "400"];  // 先頭""=未選択(ハトメ以外は空欄)。ハトメ選択時は300mmが既定
   const FABRIC = ["LN","DP","SDP"];
   const PRODUCT = ["single","two_sheet_set","skirt"];
 
   let itemSeq = 0;
+  // ハトメ以外(なし/スカート)ではピッチ欄を空欄・無効化し、ハトメを選ぶと自動で300mmを選択する
+  function onProcChange(sel){
+    const mmSel = sel.closest(".procrow").querySelector('[data-f$="_mm"]');
+    if(sel.value === "eyelet"){
+      mmSel.disabled = false;
+      if(!mmSel.value) mmSel.value = "300";
+    }else{
+      mmSel.disabled = true;
+      mmSel.value = "";
+    }
+  }
   function procRow(side, labelJa){
     return `<div class="procrow">
       <span>${labelJa}</span>
-      <select data-f="process_${side}">${PROC.map(p=>`<option>${p}</option>`).join("")}</select>
-      <input type="number" data-f="process_${side}_mm" placeholder="mm">
+      <select data-f="process_${side}" onchange="onProcChange(this)">${PROC.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select>
+      <select data-f="process_${side}_mm" disabled>${EYELET_MM.map(v=>`<option value="${v}">${v?v+"mm":"-"}</option>`).join("")}</select>
     </div>`;
   }
   function addItem(){
@@ -100,29 +113,60 @@
       <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
       <h3>明細 #${itemSeq}</h3>
       <div class="grid g3">
-        <div><label>商品種別</label><select data-f="product_type">${PRODUCT.map(p=>`<option>${p}</option>`).join("")}</select></div>
-        <div><label>原団</label><select data-f="fabric_type">${FABRIC.map(p=>`<option>${p}</option>`).join("")}</select></div>
+        <div><label>商品種別</label><select data-f="product_type" onchange="toggleBack(this)">${PRODUCT.map(p=>`<option>${p}</option>`).join("")}</select></div>
+        <div><label>原団(表面)</label><select data-f="fabric_type">${FABRIC.map(p=>`<option>${p}</option>`).join("")}</select></div>
         <div><label>数量</label><input type="number" data-f="quantity" value="1"></div>
       </div>
       <div class="grid g2" style="margin-top:6px">
-        <div><label>幅 W(mm)</label><input type="number" data-f="width_mm" placeholder="3000"></div>
-        <div><label>高さ H(mm)</label><input type="number" data-f="height_mm" placeholder="2500"></div>
+        <div><label>幅 W(mm) 表面</label><input type="number" data-f="width_mm" placeholder="3000"></div>
+        <div><label>高さ H(mm) 表面</label><input type="number" data-f="height_mm" placeholder="2500"></div>
       </div>
-      <label style="margin-top:8px">加工(種別 + 寸法mm)</label>
+      <div class="backwrap" style="display:none;margin-top:6px">
+        <div class="grid g3">
+          <div><label>原団(裏面)</label><select data-f="back_fabric_type">${FABRIC.map(p=>`<option>${p}</option>`).join("")}</select></div>
+          <div><label>幅 W(mm) 裏面</label><input type="number" data-f="back_width_mm" placeholder="3000"></div>
+          <div><label>高さ H(mm) 裏面</label><input type="number" data-f="back_height_mm" placeholder="2500"></div>
+        </div>
+      </div>
+      <label style="margin-top:8px">加工(種別 + ハトメ間隔mm)</label>
       ${procRow("top","上")}${procRow("bottom","下")}${procRow("left","左")}${procRow("right","右")}
+      <div class="grid g3" style="margin-top:8px">
+        <div><label>ベルクロ種別(全製品に付属)</label><select data-f="velcro_type">
+          <option value="male">オス</option><option value="female">メス</option>
+        </select></div>
+        <div><label>スカート取付方法</label><select data-f="skirt_attachment">
+          <option value="">-</option><option value="sew">縫い付け</option><option value="velcro">マジックテープ</option>
+        </select></div>
+        <div><label>ハトメ配置方式</label><select data-f="eyelet_method">
+          <option value="">-</option><option value="A">方式A(コーナー基準)</option><option value="B">方式B(間隔均等)</option><option value="C">方式C(未定)</option>
+        </select></div>
+      </div>
+      <label style="display:flex;flex-direction:row;align-items:center;gap:6px;margin-top:8px">
+        <input type="checkbox" data-f="skirt_no_seam" style="width:auto">スカート継ぎ目なし(シームレス)
+      </label>
       <label>防炎認証番号</label><input data-f="fire_cert_no" placeholder="BOEN-2026-...">
     `;
     document.getElementById("items").appendChild(div);
   }
   addItem();
 
+  function toggleBack(sel){
+    const wrap = sel.closest(".item").querySelector(".backwrap");
+    wrap.style.display = sel.value==="two_sheet_set" ? "block" : "none";
+  }
+
   function collectItem(el){
     const o={};
     el.querySelectorAll("[data-f]").forEach(f=>{
-      let v=f.value;
-      if(f.type==="number") v = v===""?null:Number(v);
-      if(v==="none") v="none";
-      o[f.dataset.f]= v===""?null:v;
+      const key = f.dataset.f;
+      let v;
+      if(f.type==="checkbox"){ v = f.checked; }
+      else{
+        v = f.value;
+        if(v===""){ v = null; }
+        else if(f.type==="number" || key.endsWith("_mm")){ v = Number(v); }
+      }
+      o[key]=v;
     });
     return o;
   }
@@ -140,11 +184,17 @@
       if(!r.ok){ document.getElementById("result").style.color="var(--danger)"; document.getElementById("result").textContent="エラー: "+JSON.stringify(d,null,2); return; }
       document.getElementById("result").style.color="var(--ok)";
       document.getElementById("result").innerHTML=
-        "✔ 保存完了 / 저장 완료\n注文番号: "+d.order_no+
-        "\n\nラベル(製品番号) — 클릭하면 라벨이 열리고 인쇄창이 뜹니다:\n"+
+        "✔ 保存完了\n注文番号: "+d.order_no+
+        "\n\nラベル(製品番号) — 在庫QRラベルと同様、自動で1つのタブにまとめて表示・印刷されます"+
+        "(2枚セットは表面/裏面が一緒に出ます)。開かなかった場合はこちらから:\n"+
         d.barcodes.map(b=>'  <a href=\"/label/'+encodeURIComponent(b)+'?print=1\" target=\"_blank\" style=\"color:var(--accent);font-family:monospace\">🖨 '+b+'</a>').join("\n")+
-        "\n\n→ 作業者画面·ダッシュボードで確認하세요. (스캔은 이 바코드로)";
-    }catch(e){ alert("서버 연결 실패: "+e); }
+        "\n\n→ 作業者画面・ダッシュボードで確認してください。(スキャンはこのバーコードで)";
+      // 在庫QRラベル発行と同じ方式: 注文の全バーコードを1つのタブにまとめて開き、自動で印刷ダイアログを出す
+      if(d.barcodes && d.barcodes.length){
+        const url = API_BASE+"/label?serials="+d.barcodes.map(encodeURIComponent).join(",")+"&print=1";
+        window.open(url, "_blank");
+      }
+    }catch(e){ alert("サーバー接続失敗: "+e); }
   }
   const val=id=>document.getElementById(id).value;
 </script>

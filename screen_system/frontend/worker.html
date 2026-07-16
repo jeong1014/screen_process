@@ -45,6 +45,8 @@
   .fb{font-size:38px; font-weight:900; padding:4px 22px; border-radius:14px; color:#fff;}
   .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);}
   #ono{font-size:52px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:1px;}
+  .sidebadge{font-size:20px; font-weight:800; padding:5px 16px; border-radius:10px;
+    background:#eceff3; color:var(--sub); border:2px solid var(--line);}
 
   /* ---- 工程ステップバー(工程別) ---- */
   #steps{display:flex; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap;}
@@ -76,6 +78,12 @@
   .irow .k{font-size:30px; font-weight:800; color:var(--sub); width:38%;}
   .irow .v{font-size:42px; font-weight:900;}
   .irow .v.none{color:#9aa8bb;}
+
+  /* ===== ハトメ工程だけ: スキャンから作業完了まで配置方式(A/B)の参考図を表示 ===== */
+  .eyelet-diagram{
+    background:var(--card); border:3px solid var(--line); border-radius:18px;
+    padding:16px 10px; margin-top:4px;
+  }
   .empty{text-align:center; color:#9aa8bb; font-size:30px; font-weight:800; padding:70px 20px; line-height:1.5;}
 
   /* ===== 下段: メインは「戻る」ボタン ===== */
@@ -120,6 +128,7 @@
   <button id="backBtn" disabled>戻　る</button>
 </div>
 
+<script src="/static/invhook.js"></script>
 <script>
 /* =====================================================================
    ★ 工程別ワンスキャン方式(工程ごとに 開始→完了 の2スキャン)
@@ -138,8 +147,8 @@
      POST /api/scan {order_no}     → stage+1
      POST /api/scan/undo {order_no}→ stage-1
    ===================================================================== */
-const API_BASE = ""; // 같은 서버에서 서빙 → 동일 오리진
-const USE_MOCK = false; // 실제 백엔드 연결
+const API_BASE = ""; // 同じサーバーから配信 → 同一オリジン
+const USE_MOCK = false; // 実際のバックエンドに接続
 
 const PROC = [
   {key:"cutting", name:"裁断"},
@@ -153,10 +162,11 @@ const MAX_STAGE = 8;
 
 /* ---- 工程別フィールド定義 ---- */
 const FIELDS = {
-  cutting: [["サイズ","size"],["生地の種類","fabric"]],
-  sewing:  [["マジックテープ","magictape"],["スカート","skirt"]],
-  /* ハトメは面ごとに間隔が違う → 4面それぞれ表示 */
-  eyelet:  [["上面","e_top"],["下面","e_bottom"],["左面","e_left"],["右面","e_right"]],
+  cutting: [["サイズ","size"],["生地の種類","fabric"],["スカート","skirt"]],
+  sewing:  [["マジックテープ","magictape"],["ベルクロ種別","velcro_type"],
+            ["スカート","skirt"],["スカート取付","skirt_attachment"],["スカート継ぎ目","skirt_no_seam"]],
+  /* ハトメは面ごとに間隔が違う → 4面それぞれ表示 + 配置方式 */
+  eyelet:  [["上面","e_top"],["下面","e_bottom"],["左面","e_left"],["右面","e_right"],["配置方式","eyelet_method"]],
   packing: [],   /* 梱包は追加情報なし */
 };
 
@@ -175,6 +185,20 @@ const MOCK_ORDERS = {
 let current = null;      // 最後にスキャンした注文
 let viewMode = "all";    // "all" または 工程index 0〜3(端末を工程固定するとき)
 
+/* ---- 完了/エラー等の表示を一定時間後に自動でスキャン待機画面へ戻す(モニター画面と同じ方式) ---- */
+const RESULT_HOLD_MS = 15000;
+let lastShownAt = 0;
+function resetToIdleFull(){
+  current = null;
+  document.getElementById("topOrder").innerHTML = '<span id="ono">製品番号 —</span>';
+  document.getElementById("steps").querySelectorAll(".step").forEach(el=>{ el.className = "step"; });
+  showIdle();
+  updateBackBtn();
+}
+setInterval(()=>{
+  if(lastShownAt && Date.now()-lastShownAt>RESULT_HOLD_MS){ lastShownAt=0; resetToIdleFull(); }
+}, 1000);
+
 /* ---- スキャナ入力: 画面全体でキー捕捉 ---- */
 let buf = "";
 document.addEventListener("keydown", e=>{
@@ -184,14 +208,17 @@ document.addEventListener("keydown", e=>{
 
 /* ---- スキャン = 1段階進む ---- */
 async function handleScan(code){
+  // 在庫QRシリアル(例 11-00001)なら生産ではなく在庫消尽へ
+  if(window.InvScan && InvScan.isSerial(code)){ InvScan.consume(code); return; }
   const order = await fetchOrder(code);
-  if(!order){ setStage("error","注文が見つかりません", code); return; }
+  if(!order){ setStage("error","注文が見つかりません", code); lastShownAt = Date.now(); return; }
   current = order;
 
   if(order.stage >= MAX_STAGE){
     render(order);
     setStage("error","全工程 完了済み","この注文は梱包まで完了しています");
     updateBackBtn();
+    lastShownAt = Date.now();
     return;
   }
 
@@ -199,6 +226,7 @@ async function handleScan(code){
   render(order);
   showStageBanner(order, false);
   updateBackBtn();
+  lastShownAt = Date.now();
 }
 
 /* ---- 戻る = データを消さず、1つ前の工程(段階)へ ---- */
@@ -208,6 +236,7 @@ document.getElementById("backBtn").onclick = async ()=>{
   render(current);
   showStageBanner(current, true);
   updateBackBtn();
+  lastShownAt = Date.now();
 };
 
 /* ---- テストスキャン ---- */
@@ -292,27 +321,68 @@ function renderSteps(o){
   }).join("");
 }
 
+/* ---- ハトメ配置方式(A/B)の参考図。実寸ではなく概念図(ピッチ表示のみ実際の値) ---- */
+function eyeletDiagramSVG(method, pitchMm){
+  const pitchLabel = pitchMm ? pitchMm+"mm" : "P";
+  if(method === "A"){
+    const xs = [0,110,220,330,440];
+    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
+      <text x="310" y="30" font-size="22" font-weight="800" fill="#0e63c9" text-anchor="middle">方式A・コーナー基準(ピッチ ${pitchLabel})</text>
+      <rect x="20" y="86" width="580" height="8" fill="#dde4ee" rx="4"/>
+      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#fff" stroke="#0e63c9" stroke-width="4"/>`).join("")}
+      <circle cx="600" cy="90" r="13" fill="#fff" stroke="#e07800" stroke-width="4"/>
+      <line x1="480" y1="90" x2="587" y2="90" stroke="#e07800" stroke-width="4" stroke-dasharray="8 7"/>
+      <text x="533" y="130" font-size="18" font-weight="800" fill="#e07800" text-anchor="middle">端数</text>
+      <text x="310" y="158" font-size="16" fill="#5c6b80" text-anchor="middle">コーナーから ${pitchLabel} 間隔で順に配置 → 最後に端数が出る場合あり</text>
+    </svg>`;
+  }
+  if(method === "B"){
+    const xs = [0,116,232,348,464,580];
+    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
+      <text x="310" y="30" font-size="22" font-weight="800" fill="#0e9f5a" text-anchor="middle">方式B・間隔均等(基準ピッチ ${pitchLabel})</text>
+      <rect x="20" y="86" width="580" height="8" fill="#dde4ee" rx="4"/>
+      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#fff" stroke="#0e9f5a" stroke-width="4"/>`).join("")}
+      <text x="310" y="158" font-size="16" fill="#5c6b80" text-anchor="middle">端から端まで等間隔になるようピッチを調整 → 端数は出ません</text>
+    </svg>`;
+  }
+  return `<div style="text-align:center;color:#9aa8bb;font-size:26px;font-weight:800;padding:36px 10px;line-height:1.6">
+    配置方式(方式C)は<br>現在未定です</div>`;
+}
+
 /* ---- 情報テーブル描画 ---- */
 function renderFields(idx, o){
-  const fields = FIELDS[PROC[idx].key];
+  const key = PROC[idx].key;
+  const fields = FIELDS[key];
   if(!fields.length){
     document.getElementById("info").innerHTML =
       '<div class="empty">梱包工程<br>追加の作業情報はありません<br>スキャンで送り状を発行します</div>';
     return;
   }
-  document.getElementById("info").innerHTML = fields.map(([k,f])=>{
+  let html = fields.map(([k,f])=>{
     const raw = (o && o[f] != null) ? String(o[f]) : "—";
     const isNone = NONE_VALS.includes(raw.trim());
     const val = isNone ? "なし" : raw;
     return '<div class="irow"><span class="k">'+k+'</span>'+
            '<span class="v'+(isNone?' none':'')+'">'+val+'</span></div>';
   }).join("");
+  /* ハトメ工程だけ、スキャンしてから作業完了までこの参考図を表示し続ける
+     (完了スキャン後は displayIdx が次工程=梱包に切り替わるため自動的に消える) */
+  if(key === "eyelet"){
+    const method = o ? o.eyelet_method_code : null;
+    const pitch = o ? o.eyelet_pitch_mm : null;
+    html += '<div class="eyelet-diagram">'+eyeletDiagramSVG(method, pitch)+'</div>';
+  }
+  document.getElementById("info").innerHTML = html;
 }
 
 /* ---- 全体描画 ---- */
 function render(o){
+  // 2枚セット(two_sheet_set)は表面/裏面が別バーコード → どちら側か+対のバーコードを表示
+  const sideBadge = o.sheet_side
+    ? '<span class="sidebadge">'+o.sheet_side+(o.pair_barcode?' ・ペア '+o.pair_barcode:'')+'</span>'
+    : '';
   document.getElementById("topOrder").innerHTML =
-    '<span class="fb '+o.fabric+'">'+o.fabric+'</span><span id="ono">'+o.order_no+'</span>';
+    '<span class="fb '+o.fabric+'">'+o.fabric+'</span><span id="ono">'+o.order_no+'</span>'+sideBadge;
   renderSteps(o);
   renderFields(displayIdx(o), o);
 }

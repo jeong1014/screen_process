@@ -87,7 +87,7 @@
   }
 
   /* ===== 右パネル ===== */
-  .side{flex:1; display:flex; flex-direction:column; gap:16px; min-width:330px; max-width:420px;}
+  .side{flex:1; display:flex; flex-direction:column; gap:16px; min-width:330px; max-width:420px; min-height:0;}
   .panel{background:var(--card); border:3px solid var(--line); border-radius:20px; padding:16px 20px;}
   .panel h2{margin:0 0 12px; font-size:22px; font-weight:900; letter-spacing:3px; color:var(--sub);}
 
@@ -103,7 +103,9 @@
   .stat.working .v{color:var(--working);} .stat.ship .v{color:var(--ship);}
 
   /* ===== 左: 在庫 ===== */
-  .invcol{flex:0 0 300px; display:flex; flex-direction:column; gap:16px;}
+  .invcol{flex:0 0 300px; display:flex; flex-direction:column; gap:16px; min-height:0; overflow-y:auto; overflow-x:hidden;}
+  .invcol::-webkit-scrollbar, .histp::-webkit-scrollbar{width:8px;}
+  .invcol::-webkit-scrollbar-thumb, .histp::-webkit-scrollbar-thumb{background:var(--line); border-radius:99px;}
   .inv-item{padding:14px 0 18px; border-bottom:3px solid var(--line);}
   .inv-item:last-child{border-bottom:none; padding-bottom:0;}
   .inv-top{display:flex; align-items:baseline; gap:10px; margin-bottom:10px;}
@@ -116,7 +118,7 @@
   .inv-bar i.low{background:var(--err, #d63b2f);}
   .inv-low{margin-top:8px; font-size:22px; font-weight:900; color:#d63b2f;}
 
-  .histp{flex:1; overflow:hidden;}
+  .histp{flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;}
   .hrow{
     display:flex; gap:12px; align-items:center; padding:11px 2px;
     border-bottom:2px solid var(--line); font-size:22px; font-weight:800;
@@ -141,11 +143,11 @@
 
 <div class="wrap">
   <div class="invcol">
-    <div class="panel" style="flex:1;">
+    <div class="panel" style="flex:0 0 auto;">
       <h2>生地在庫</h2>
       <div id="inv"></div>
     </div>
-    <div class="panel" style="flex:1;">
+    <div class="panel" style="flex:0 0 auto;">
       <h2>付属品在庫</h2>
       <div id="inv2"></div>
     </div>
@@ -179,8 +181,8 @@
    GET /api/inventory   → 生地在庫 [{fabric, remain, cap}] ※ロール単位
    GET /api/accessories → 付属品在庫 [{name, remain, cap, unit}]
    ===================================================================== */
-const API_BASE = ""; // 같은 서버에서 서빙 → 동일 오리진
-const USE_MOCK = false; // 실제 백엔드 연결
+const API_BASE = ""; // 同じサーバーから配信 → 同一オリジン
+const USE_MOCK = false; // 実際のバックエンドに接続
 const REFRESH_MS = 10000;
 const MAX_ROWS = 4;                 // 画面に収まる行数(大型モニターに合わせ調整)
 

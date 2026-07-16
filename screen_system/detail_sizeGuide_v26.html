@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日本スクリーンゴルフ生地専門店</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cdi: {
+              main: '#0047AB',       // 기본 CDI 블루
+              dark: '#002f73',       // 마우스 오버 시 어두워지는 블루
+              light: '#f0f5ff',      // 선택된 배경 연한 블루
+              border: '#cce0ff'      // 연한 블루 테두리
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    
+    // アイコンコンポーネント
+    const ShoppingCart = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+      </svg>
+    );
+    
+    const Award = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+      </svg>
+    );
+    
+    const Shield = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    );
+    
+    const Truck = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+      </svg>
+    );
+    
+    const Calculator = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>
+        <line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="14" x2="8" y2="14"/>
+        <line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/>
+        <line x1="12" y1="18" x2="12" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/>
+      </svg>
+    );
+    
+    const Maximize2 = ({ className, size = 24 }) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+        <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+      </svg>
+    );
+
+    function GolfScreenShop() {
+      const [screenType, setScreenType] = useState(null);
+      const [velcroType, setVelcroType] = useState('male');
+      const [velcroSides, setVelcroSides] = useState('3');
+      const [frontFabricType, setFrontFabricType] = useState('low-noise');
+      const [backFabricType, setBackFabricType] = useState('low-noise');
+      
+      const [frontHeight, setFrontHeight] = useState(3000);
+      const [frontWidth, setFrontWidth] = useState(2000);
+      const [frontWidthInput, setFrontWidthInput] = useState('2000');
+      const [frontHeightInput, setFrontHeightInput] = useState('3000');
+
+      const [backHeight, setBackHeight] = useState(3000);
+      const [backWidth, setBackWidth] = useState(2000);
+      const [backWidthInput, setBackWidthInput] = useState('2000');
+      const [backHeightInput, setBackHeightInput] = useState('3000');
+
+      const [hasSkirt, setHasSkirt] = useState(false);
+      const [skirtNoSeam, setSkirtNoSeam] = useState(false);
+      const [skirtAttachment, setSkirtAttachment] = useState('sew'); // 'sew' | 'velcro'
+      const [isFireRetardant, setIsFireRetardant] = useState(false);
+
+      const [eyeletSides, setEyeletSides] = useState('3'); 
+      const [eyeletSpacing, setEyeletSpacing] = useState(300); 
+      // --- v23: 하토메 배치 방식 상태 추가 ---
+      const [eyeletMethod, setEyeletMethod] = useState('A'); 
+
+      const [quantity, setQuantity] = useState(1);
+      const [quantityInput, setQuantityInput] = useState('1');
+      const [showSampleModal, setShowSampleModal] = useState(false);
+      const [showOrderModal, setShowOrderModal] = useState(false);
+      const [showSizeGuideModal, setShowSizeGuideModal] = useState(false);
+      const [showSkirtGuideModal, setShowSkirtGuideModal] = useState(false);
+      const [showAdminModal, setShowAdminModal] = useState(false);
+      const [showAdminPanel, setShowAdminPanel] = useState(false);
+      const [isAdminMode, setIsAdminMode] = useState(false);
+      const [adminId, setAdminId] = useState('');
+      const [adminPw, setAdminPw] = useState('');
+      const [showCart, setShowCart] = useState(false);
+      const [cart, setCart] = useState([]);
+      const [selectedCartItems, setSelectedCartItems] = useState([]);
+      const [showEyeletGuideModal, setShowEyeletGuideModal] = useState(false); 
+      const [showFabricGuideModal, setShowFabricGuideModal] = useState(false);
+      const [showEyeletLayoutModal, setShowEyeletLayoutModal] = useState(false);
+
+      const widthCategories = {
+        small: { label: 'S (～3m)', min: 2000, max: 3000 },
+        medium: { label: 'M (3m～4m)', min: 3010, max: 4000 },
+        large: { label: 'L (4m～6m)', min: 4010, max: 6000 }
+      };
+      
+      const [frontWidthCategory, setFrontWidthCategory] = useState('small');
+      const [backWidthCategory, setBackWidthCategory] = useState('small');
+
+      const handleFrontWidthCategoryChange = (key) => {
+        setFrontWidthCategory(key);
+        const cat = widthCategories[key];
+        if (frontWidth < cat.min || frontWidth > cat.max) {
+          setFrontWidth(cat.max);
+          setFrontWidthInput(cat.max.toString());
+        }
+      };
+
+      const handleBackWidthCategoryChange = (key) => {
+        setBackWidthCategory(key);
+        const cat = widthCategories[key];
+        if (backWidth < cat.min || backWidth > cat.max) {
+          setBackWidth(cat.max);
+          setBackWidthInput(cat.max.toString());
+        }
+      };
+
+      const [fabricImages, setFabricImages] = useState({
+        'double-poly': './detail_photo/DP.jpg',
+        'special-double-poly': './detail_photo/SDP.jpg',
+        'low-noise': './detail_photo/LN.jpg'
+      });
+      const [fabricHoverImages, setFabricHoverImages] = useState({
+        'double-poly': './detail_photo/DP.jpg',
+        'special-double-poly': './detail_photo/SDP.jpg',
+        'low-noise': './detail_photo/LN.jpg'
+      });
+      const [screenTypeImages, setScreenTypeImages] = useState({ single: '', double: './detail_photo/2maiscreen.jpg' });
+      const [eyeletImages, setEyeletImages] = useState({ A: '', B: '', C: '' });
+      const [hoverPreview, setHoverPreview] = useState(null); // {src, title}
+
+      const [skirtSettings, setSkirtSettings] = useState({
+        baseWidthMm: 3720,
+        basePriceYen: 7000,
+        noSeamAdd: 3000,
+        noSeamMinWidth: 3300,
+      });
+
+      const [fabricPriceSettings, setFabricPriceSettings] = useState({
+        basePricePerMm: 117,
+        dpMultiplier: 1.1,
+        sdpMultiplier: 1.2,
+      });
+
+      const [fireDiscountRate, setFireDiscountRate] = useState(20);
+      const [eyelet4SideFlatFee, setEyelet4SideFlatFee] = useState(1100);
+      const [velcroSidePrice, setVelcroSidePrice] = useState(1.5); // 75,000원÷10=7,500円/50m → 1.5円/10mm
+
+      const [discountTiers, setDiscountTiers] = useState([
+        { id: 1, minQty: 6,  maxQty: 10,   rate: 5  },
+        { id: 2, minQty: 11, maxQty: 20,   rate: 10 },
+        { id: 3, minQty: 21, maxQty: 50,   rate: 15 },
+        { id: 4, minQty: 51, maxQty: null, rate: 20 },
+      ]);
+
+      const screenTypes = {
+        single: { label: '1枚スクリーン', tag: 'シンプル・低コスト', description: '1枚構造。\n新規設置・表地の交換にも対応。', note: null },
+        double: { label: '2枚スクリーンSET', tag: 'スタンダード・おすすめ', description: '表裏2枚構成のスタンダードモデル。', note: null },
+      };
+
+      const fabricTypes = {
+        'low-noise': { name: 'LN', tag: '静音優先', description: '打撃音を大幅に軽減。\n静音性重視。' },
+        'double-poly': { name: 'DP', tag: 'はじめての方に最適', description: '耐久性・画質・価格のバランスモデル。' },
+        'special-double-poly': { name: 'SDP', tag: '高画質優先', description: '密度が高く映像がクリア。\n高画質重視。' },
+      };
+
+      const calculateFabricPrice = (fabricType, wMm, fireOpt) => {
+        if (isNaN(wMm)) return 0;
+        let price = (wMm / 10) * fabricPriceSettings.basePricePerMm;
+        if (fabricType === 'double-poly') price *= fabricPriceSettings.dpMultiplier;
+        else if (fabricType === 'special-double-poly') price *= fabricPriceSettings.sdpMultiplier;
+        if (fireOpt === false) price *= (1 - fireDiscountRate / 100);
+        return Math.round(price / 100) * 100;
+      }
+      
+      const calculateSkirtPrice = (wMm, fireOpt) => {
+        if (isNaN(wMm)) return 0;
+        let price = (wMm / skirtSettings.baseWidthMm) * skirtSettings.basePriceYen;
+        if (fireOpt === false) price *= (1 - fireDiscountRate / 100);
+        return Math.round(price / 100) * 100;
+      };
+
+      const calculateDiscount = (qty) => {
+        const sorted = [...discountTiers].sort((a, b) => b.minQty - a.minQty);
+        for (const tier of sorted) {
+          if (qty >= tier.minQty) return tier.rate / 100;
+        }
+        return 0;
+      };
+
+      const handleAdminLogin = () => {
+        if (adminId === 'admin' && adminPw === '1234') {
+          setIsAdminMode(true);
+          setShowAdminModal(false);
+          alert('管理者モードに入りました');
+        } else {
+          alert('IDまたはパスワードが間違っています');
+        }
+      };
+
+      const handleImageUpload = (fabricType, event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => { setFabricImages(prev => ({ ...prev, [fabricType]: reader.result })); };
+          reader.readAsDataURL(file);
+        }
+      };
+      const handleFabricHoverImageUpload = (fabricType, event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => { setFabricHoverImages(prev => ({ ...prev, [fabricType]: reader.result })); };
+          reader.readAsDataURL(file);
+        }
+      };
+      const handleScreenTypeImageUpload = (key, event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => { setScreenTypeImages(prev => ({ ...prev, [key]: reader.result })); };
+          reader.readAsDataURL(file);
+        }
+      };
+      const handleEyeletImageUpload = (key, event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => { setEyeletImages(prev => ({ ...prev, [key]: reader.result })); };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const eyeletLayout = useMemo(() => {
+        if (screenType === 'skirtOnly') return null;
+
+        const widthMm = frontWidth;
+        const heightMm = frontHeight;
+
+        // v23: 현재는 A, B, C 방식 모두 아래의 동일한 로직을 사용합니다.
+        // 추후 로직이 확정되면 if (eyeletMethod === 'A') { ... } else if ('B') { ... } 형태로 분기 가능
+        const calcPositions = (lengthMm, pitchMm) => {
+          if (lengthMm <= pitchMm) {
+            return [0, lengthMm];
+          }
+          let count = Math.round(lengthMm / pitchMm);
+          if (count < 2) count = 2;
+          const step = lengthMm / count;
+          const result = [];
+          for (let i = 0; i <= count; i++) {
+            result.push(i * step);
+          }
+          return result;
+        };
+
+        const useTop = true;
+        const useLeft = true;
+        const useRight = true;
+        const useBottom = eyeletSides === '4';
+
+        const top = useTop ? calcPositions(widthMm, eyeletSpacing) : [];
+        const bottom = useBottom ? calcPositions(widthMm, eyeletSpacing) : [];
+        const left = useLeft ? calcPositions(heightMm, eyeletSpacing) : [];
+        const right = useRight ? calcPositions(heightMm, eyeletSpacing) : [];
+
+        let overlap = 0;
+        if (useTop && useLeft && top.length && left.length) overlap++;
+        if (useTop && useRight && top.length && right.length) overlap++;
+        if (useBottom && useLeft && bottom.length && left.length) overlap++;
+        if (useBottom && useRight && bottom.length && right.length) overlap++;
+
+        const total = top.length + bottom.length + left.length + right.length - overlap;
+        // 3면 기준 개수 (하단 제외) — 4면 고정요금 계산용
+        const overlap3 = (top.length && left.length ? 1 : 0) + (top.length && right.length ? 1 : 0);
+        const total3Side = top.length + left.length + right.length - overlap3;
+
+        return { widthMm, heightMm, top, bottom, left, right, total, total3Side, useTop, useBottom, useLeft, useRight };
+      }, [
+        frontWidth, frontHeight, eyeletSpacing, screenType, eyeletSides, eyeletMethod
+      ]);
+
+      const totalPrice = useMemo(() => {
+        if (!screenType) return { subtotal: 0, eyeletCost: 0, velcroCost: 0, skirtCost: 0, fireDiscount: 0, discount: 0, discountAmount: 0, total: 0, freeShipping: false };
+        let subtotal = 0;
+
+        const currentSkirtPrice = calculateSkirtPrice(frontWidth, isFireRetardant);
+    
+        if (screenType === 'skirtOnly') {
+          subtotal = currentSkirtPrice; 
+          if (frontWidth > skirtSettings.noSeamMinWidth && skirtNoSeam) subtotal += skirtSettings.noSeamAdd;
+        } else if (screenType === 'single' || screenType === 'replacement') {
+          subtotal = calculateFabricPrice(frontFabricType, frontWidth, isFireRetardant);
+          if (hasSkirt) {
+            subtotal += currentSkirtPrice; 
+            if (frontWidth > skirtSettings.noSeamMinWidth && skirtNoSeam) subtotal += skirtSettings.noSeamAdd;
+          }
+        } else if (screenType === 'double') {
+          subtotal = calculateFabricPrice(frontFabricType, frontWidth, isFireRetardant);
+          subtotal += calculateFabricPrice(backFabricType, backWidth, isFireRetardant);
+          if (hasSkirt) {
+            subtotal += currentSkirtPrice; 
+            if (frontWidth > skirtSettings.noSeamMinWidth && skirtNoSeam) subtotal += skirtSettings.noSeamAdd;
+          }
+        }
+        const discount = calculateDiscount(quantity);
+        const maxTierMin = discountTiers.length > 0 ? Math.max(...discountTiers.map(t => t.minQty)) : 51;
+        const eyeletCost = (screenType !== 'skirtOnly' && eyeletLayout && eyeletSides === '4')
+          ? eyelet4SideFlatFee : 0;
+        
+        const velcroBase = (frontWidth / 10) * velcroSidePrice;
+        const velcroMultiplier = velcroSides === 'none' ? 0 : parseInt(velcroSides) || 0;
+        const velcroCost = (screenType !== 'skirtOnly' && velcroSides !== 'none')
+          ? Math.ceil(velcroBase * velcroMultiplier / 100) * 100
+          : 0;
+        
+        const skirtCost = hasSkirt || screenType === 'skirtOnly'
+          ? currentSkirtPrice + (frontWidth > skirtSettings.noSeamMinWidth && skirtNoSeam ? skirtSettings.noSeamAdd : 0)
+          : 0;
+        const fireDiscount = !isFireRetardant ? Math.round(subtotal * (fireDiscountRate / 100)) : 0;
+        const total = (subtotal + eyeletCost + velcroCost) * (1 - discount) * quantity;
+        return {
+          subtotal,
+          eyeletCost,
+          velcroCost,
+          skirtCost,
+          fireDiscount,
+          discount: discount * 100,
+          discountAmount: (subtotal + eyeletCost + velcroCost) * discount * quantity,
+          total,
+          freeShipping: quantity >= maxTierMin
+        };
+      }, [screenType, frontFabricType, backFabricType, frontWidth, frontHeight, backWidth, backHeight, hasSkirt, skirtNoSeam, quantity, isFireRetardant, eyeletLayout, velcroSides, eyeletSides, fabricPriceSettings, fireDiscountRate, eyelet4SideFlatFee, velcroSidePrice, skirtSettings, discountTiers]);
+
+      const addToCart = () => {
+        if (!screenType) { alert('スクリーンタイプを選択してください。'); return; }
+        const item = {
+          id: Date.now(),
+          screenType: screenTypes[screenType] ? screenTypes[screenType].label : screenType,
+          fireRetardant: isFireRetardant ? 'あり' : 'なし',
+          fireDiscount: totalPrice.fireDiscount,
+          velcroType: (screenType === 'skirtOnly' || velcroSides === 'none') 
+            ? null 
+            : (velcroType === 'male' ? 'オス' : 'メス') + 'ベルクロ',
+          velcroSides: velcroSides === 'none' ? 'なし' : velcroSides,
+          velcroCost: totalPrice.velcroCost,
+          frontFabric: screenType !== 'skirtOnly' ? fabricTypes[frontFabricType].name : null,
+          backFabric: screenType === 'double' ? fabricTypes[backFabricType].name : null,
+          frontWidth: screenType !== 'skirtOnly' ? frontWidth : null,
+          frontHeight: screenType !== 'skirtOnly' ? frontHeight : null,
+          backWidth: screenType === 'double' ? backWidth : null,
+          backHeight: screenType === 'double' ? backHeight : null,
+          hasSkirt,
+          skirtAttachment: hasSkirt ? skirtAttachment : null,
+          skirtNoSeam: hasSkirt && frontWidth > skirtSettings.noSeamMinWidth ? skirtNoSeam : false,
+          skirtCost: totalPrice.skirtCost,
+          eyeletSides: screenType !== 'skirtOnly' ? eyeletSides : null,
+          eyeletSpacing: screenType !== 'skirtOnly' ? eyeletSpacing : null,
+          eyeletMethod: screenType !== 'skirtOnly' ? eyeletMethod : null, // v23: 하토메 방식 추가
+          eyeletCount: (screenType !== 'skirtOnly' && eyeletLayout) ? eyeletLayout.total : 0,
+          eyeletCost: totalPrice.eyeletCost,
+          quantity,
+          sheetMultiplier: screenType === 'double' ? 2 : (screenType === 'skirtOnly' ? 0 : 1),
+          unitPrice: totalPrice.subtotal,
+          totalPrice: totalPrice.total,
+          discount: totalPrice.discount
+        };
+        setCart([...cart, item]);
+        alert('カートに追加しました！');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const removeFromCart = (id) => {
+        setCart(cart.filter(item => item.id !== id));
+        setSelectedCartItems(selectedCartItems.filter(itemId => itemId !== id));
+      };
+      const updateCartQuantity = (id, delta) => {
+  setCart(cart.map(item => {
+    if (item.id === id) {
+      const newQty = Math.max(1, item.quantity + delta);
+      // 기존 1개당 단가를 구해서 새로운 수량에 곱함
+      const unitPriceTotal = item.totalPrice / item.quantity; 
+      return { ...item, quantity: newQty, totalPrice: unitPriceTotal * newQty };
+    }
+    return item;
+  }));
+};
+
+      const toggleCartItem = (id) => {
+        if (selectedCartItems.includes(id)) {
+          setSelectedCartItems(selectedCartItems.filter(itemId => itemId !== id));
+        } else {
+          setSelectedCartItems([...selectedCartItems, id]);
+        }
+      };
+
+      const toggleAllCartItems = () => {
+        if (selectedCartItems.length === cart.length) {
+          setSelectedCartItems([]);
+        } else {
+          setSelectedCartItems(cart.map(item => item.id));
+        }
+      };
+
+      const deleteSelectedItems = () => {
+        setCart(cart.filter(item => !selectedCartItems.includes(item.id)));
+        setSelectedCartItems([]);
+      };
+
+      const loadCartItemForEdit = (item) => {
+        setCart(cart.filter(c => c.id !== item.id));
+        setSelectedCartItems(selectedCartItems.filter(id => id !== item.id));
+        const screenTypeMap = { '1枚スクリーン': 'single', '2枚スクリーンSET': 'double', 'スカートのみ': 'skirtOnly' };
+        const fabricMap = { 'LN': 'low-noise', 'DP': 'double-poly', 'SDP': 'special-double-poly' };
+        const st = screenTypeMap[item.screenType] || 'single';
+        setScreenType(st);
+        setIsFireRetardant(item.fireRetardant === 'あり');
+        setVelcroSides(item.velcroSides === 'なし' ? 'none' : (item.velcroSides || '3'));
+        if (item.velcroType) setVelcroType(item.velcroType === 'オスベルクロ' ? 'male' : 'female');
+        if (item.frontFabric) setFrontFabricType(fabricMap[item.frontFabric] || 'low-noise');
+        if (item.backFabric) setBackFabricType(fabricMap[item.backFabric] || 'low-noise');
+        if (item.frontWidth) { setFrontWidth(item.frontWidth); setFrontWidthInput(item.frontWidth.toString()); }
+        if (item.frontHeight) { setFrontHeight(item.frontHeight); setFrontHeightInput(item.frontHeight.toString()); }
+        if (item.backWidth) { setBackWidth(item.backWidth); setBackWidthInput(item.backWidth.toString()); }
+        if (item.backHeight) { setBackHeight(item.backHeight); setBackHeightInput(item.backHeight.toString()); }
+        setHasSkirt(item.hasSkirt || false);
+        if (item.skirtAttachment) setSkirtAttachment(item.skirtAttachment);
+        setSkirtNoSeam(item.skirtNoSeam || false);
+        if (item.eyeletSides) setEyeletSides(item.eyeletSides);
+        if (item.eyeletSpacing) setEyeletSpacing(item.eyeletSpacing);
+        if (item.eyeletMethod) setEyeletMethod(item.eyeletMethod);
+        const qty = item.quantity || 1;
+        setQuantity(qty); setQuantityInput(qty.toString());
+        alert('カート内容を読み込みました。修正後カートに追加してください。');
+      };
+
+      const cartTotal = useMemo(() => {
+        return cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      }, [cart]);
+
+      const renderSizePanel = (type) => {
+        const isFront = type === 'front';
+        const title = isFront ? (screenType === 'double' ? '表地' : 'サイズ調整') : '裏地';
+        const titleColor = isFront ? 'text-cdi-main' : 'text-gray-700';
+        const bgHeader = isFront ? 'bg-cdi-light' : 'bg-gray-100';
+        const borderColor = isFront ? 'border-cdi-main' : 'border-gray-400';
+        
+        const w = isFront ? frontWidth : backWidth;
+        const setW = isFront ? setFrontWidth : setBackWidth;
+        const wInput = isFront ? frontWidthInput : backWidthInput;
+        const setWInput = isFront ? setFrontWidthInput : setBackWidthInput;
+        
+        const h = isFront ? frontHeight : backHeight;
+        const setH = isFront ? setFrontHeight : setBackHeight;
+        const hInput = isFront ? frontHeightInput : backHeightInput;
+        const setHInput = isFront ? setFrontHeightInput : setBackHeightInput;
+
+        const wCat = isFront ? frontWidthCategory : backWidthCategory;
+        const setWCat = isFront ? handleFrontWidthCategoryChange : handleBackWidthCategoryChange;
+        
+        const fabricTypeKey = isFront ? frontFabricType : backFabricType;
+
+        return (
+          <div className={`rounded-lg overflow-hidden border-2 mb-6 ${borderColor}`}>
+            <div className={`px-4 py-3 ${bgHeader} border-b ${borderColor}`}>
+              <h3 className={`font-bold text-lg ${titleColor}`}>{title}</h3>
+            </div>
+            <div className="p-5">
+              <div className="mb-6">
+                <p className="font-semibold mb-3 text-sm text-gray-800">幅（横）サイズ区分を選択</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {Object.entries(widthCategories).map(([key, cat]) => (
+                    <button
+                      key={key}
+                      onClick={() => setWCat(key)}
+                      className={`py-2.5 border-2 rounded-lg font-bold text-sm transition-all ${
+                        wCat === key 
+                          ? 'border-cdi-main bg-cdi-light text-cdi-main shadow-sm' 
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6 bg-gray-50 rounded-lg p-5 border border-gray-100">
+                <p className="font-semibold mb-3 text-sm text-gray-800">数値直接入力</p>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 text-gray-600">幅（mm）</label>
+                    <input 
+                      type="text" 
+                      value={wInput}
+                      onChange={(e) => setWInput(e.target.value)}
+                      onBlur={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          const newWidth = Math.min(6000, Math.max(2000, val));
+                          setW(newWidth);
+                          setWInput(newWidth.toString());
+                          
+                          if (newWidth <= 3000) { if(wCat !== 'small') setWCat('small'); }
+                          else if (newWidth <= 4000) { if(wCat !== 'medium') setWCat('medium'); }
+                          else { if(wCat !== 'large') setWCat('large'); }
+                        } else {
+                          setWInput(w.toString());
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg font-semibold focus:border-cdi-main focus:ring-1 focus:ring-cdi-main outline-none transition-all bg-white" 
+                      placeholder={`${widthCategories[wCat].min}-${widthCategories[wCat].max}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 text-gray-600">高さ（mm）</label>
+                    <input
+                      type="text"
+                      value={hInput}
+                      onChange={(e) => setHInput(e.target.value)}
+                      onBlur={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          const newHeight = Math.min(3000, Math.max(1000, val));
+                          setH(newHeight);
+                          setHInput(newHeight.toString());
+                        } else {
+                          setHInput(h.toString());
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg font-semibold focus:border-cdi-main focus:ring-1 focus:ring-cdi-main outline-none transition-all bg-white"
+                      placeholder="1000-3000"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-6 border border-gray-100 shadow-sm">
+                <div className="mb-8">
+                  <label className="block font-semibold mb-3 text-gray-800">
+                    幅（横）: <span className="text-cdi-main">{w}mm</span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min={widthCategories[wCat].min}
+                      max={widthCategories[wCat].max}
+                      step="10"
+                      value={w}
+                      onChange={(e) => {
+                        const newWidth = parseInt(e.target.value);
+                        setW(newWidth);
+                        setWInput(newWidth.toString());
+                      }}
+                      className="flex-1 h-1.5 bg-gray-200 rounded-lg cursor-pointer accent-cdi-main"
+                    />
+                  </div>
+                </div>
+                
+                <div style={{display: 'flex', gap: '50px', position: 'relative', paddingLeft: '0px'}}>
+                  <div style={{flexShrink: 0, width: '6'}}>
+                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: '400px', paddingTop: '40px'}}>
+                      <div style={{flex: 1, position: 'relative', width: '40px', height: '280px'}}>
+                        <input
+                          type="range"
+                          min="1000"
+                          max="3000"
+                          step="10"
+                          value={h}
+                          onChange={(e) => {
+                            const newHeight = parseInt(e.target.value);
+                            setH(newHeight);
+                            setHInput(newHeight.toString());
+                          }}
+                          style={{
+                            position: 'absolute', width: '280px', height: '6px', left: '-120px', top: '140px',
+                            transform: 'rotate(-90deg)', transformOrigin: 'center', appearance: 'none', background: '#e5e7eb',
+                            borderRadius: '4px', cursor: 'pointer'
+                          }}
+                          className="accent-cdi-main"
+                        />
+                      </div>
+                      <div style={{marginTop: '305px', color: '#0047AB', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'center'}}>
+                        {h}mm
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: '40px'}}>
+                    <div style={{fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '6px', color: '#374151'}}>
+                      <Maximize2 className="w-4 h-4 text-gray-400" size={16} />サイズプレビュー
+                      {isFront && screenType !== 'skirtOnly' && eyeletLayout && (
+                        <span className="text-xs font-normal text-cdi-main bg-cdi-light px-2 py-0.5 rounded ml-1 border border-cdi-border">
+                          ハトメ配置反映 (方式{eyeletMethod})
+                        </span>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const scale = Math.min(400 / w, 260 / h);
+                      const pxW = Math.max(w * scale, 150);
+                      const pxH = Math.max(h * scale, 100);
+                      const showEyelet = ((isFront && screenType !== 'skirtOnly' && screenType !== 'double') || (!isFront && screenType === 'double')) && eyeletLayout;
+                      // 2枚タイプ: スカートは裏地(back)の下に表示、1枚タイプ: 表地(front)の下
+                      const showSkirt = hasSkirt && (screenType === 'double' ? !isFront : isFront);
+                      const vcColor = '#1f2937';
+                      const vcThick = '6px';
+                      return (
+                        <div style={{width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '30px'}}>
+                          {/* メイン生地矩形 */}
+                          <div style={{
+                            width: pxW + 'px', height: pxH + 'px',
+                            backgroundColor: '#f8fafc',
+                            border: isFront ? '3px solid #cbd5e1' : '3px dashed #94a3b8',
+                            borderRadius: showSkirt ? '6px 6px 0 0' : '6px',
+                            borderBottom: showSkirt ? (isFront ? '3px dashed #94a3b8' : '3px dashed #94a3b8') : undefined,
+                            position: 'relative', overflow: 'hidden', transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            {/* 중앙 정보 배지 */}
+                            <div style={{textAlign: 'center', padding: '12px', zIndex: 10, pointerEvents: 'none'}}>
+                              <p style={{fontWeight: 'bold', fontSize: '1.1rem', color: '#1f2937', marginBottom: '8px'}}>{w} × {h}</p>
+                              <span style={{fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.9)', color: '#0047AB', padding: '3px 10px', borderRadius: '6px', fontWeight: '700', border: '1px solid #cce0ff'}}>
+                                生地素材: {fabricTypes[fabricTypeKey].name}
+                              </span>
+                            </div>
+                            {/* ベルクロ帯 */}
+                            {screenType !== 'skirtOnly' && velcroSides !== 'none' && (<>
+                              <div style={{position:'absolute',top:0,left:0,right:0,height:vcThick,backgroundColor:vcColor,opacity:0.75,zIndex:15}}></div>
+                              <div style={{position:'absolute',top:0,left:0,bottom:0,width:vcThick,backgroundColor:vcColor,opacity:0.75,zIndex:15}}></div>
+                              <div style={{position:'absolute',top:0,right:0,bottom:0,width:vcThick,backgroundColor:vcColor,opacity:0.75,zIndex:15}}></div>
+                              {velcroSides === '4' && (
+                                <div style={{position:'absolute',bottom:0,left:0,right:0,height:vcThick,backgroundColor:vcColor,opacity:0.75,zIndex:15}}></div>
+                              )}
+                            </>)}
+                            {/* ハトメ SVG — スカートある場合は下辺ドット非表示 */}
+                            {showEyelet && (
+                              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 20 }}>
+                                {eyeletLayout.top.map((pos, idx) => <circle key={`pt-${idx}`} cx={`calc(6px + ${(pos / eyeletLayout.widthMm)} * (100% - 12px))`} cy="6" r="2.5" fill="#ffffff" stroke="#64748b" strokeWidth="1.5" />)}
+                                {eyeletLayout.bottom.map((pos, idx) => <circle key={`pb-${idx}`} cx={`calc(6px + ${(pos / eyeletLayout.widthMm)} * (100% - 12px))`} cy="calc(100% - 6px)" r="2.5" fill="#ffffff" stroke="#64748b" strokeWidth="1.5" />)}
+                                {eyeletLayout.left.map((pos, idx) => <circle key={`pl-${idx}`} cx="6" cy={`calc(6px + ${(pos / eyeletLayout.heightMm)} * (100% - 12px))`} r="2.5" fill="#ffffff" stroke="#64748b" strokeWidth="1.5" />)}
+                                {eyeletLayout.right.map((pos, idx) => <circle key={`pr-${idx}`} cx="calc(100% - 6px)" cy={`calc(6px + ${(pos / eyeletLayout.heightMm)} * (100% - 12px))`} r="2.5" fill="#ffffff" stroke="#64748b" strokeWidth="1.5" />)}
+                              </svg>
+                            )}
+                          </div>
+                          {/* スカート矩形 — 別体として生地の直下に追加 */}
+                          {showSkirt && (
+                            <div style={{
+                              width: pxW + 'px', height: '40px',
+                              backgroundColor: '#94a3b8',
+                              border: '3px solid #64748b', borderTop: 'none',
+                              borderRadius: '0 0 6px 6px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                              transition: 'all 0.2s'
+                            }}>
+                              <span style={{color: 'white', fontSize: '0.65rem', fontWeight: 'bold'}}>スカート</span>
+                              <span style={{color: '#e2e8f0', fontSize: '0.6rem'}}>
+                                ({skirtAttachment === 'sew' ? '縫い付け' : 'マジックテープ'})
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div style={{display: 'flex', gap: '12px', justifyContent: 'center'}}>
+                      <div style={{backgroundColor: '#f8fafc', borderRadius: '8px', padding: '16px 24px', border: '1px solid #e2e8f0', textAlign: 'center', minWidth: '200px'}}>
+                        <div style={{color: '#64748b', marginBottom: '6px', fontSize: '0.8rem', fontWeight: '600'}}>
+                          現在の合計金額
+                        </div>
+                        <div style={{fontWeight: '800', fontSize: '1.5rem', color: '#0047AB'}}>
+                          ¥{Math.floor(totalPrice.total).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+          {/* ホバープレビュー — 要素の上に表示 */}
+          {hoverPreview && (() => {
+            const TIP_W = 580;
+            const cx = hoverPreview.x || 0;
+            const ey = hoverPreview.y || 200;
+            const left = Math.max(4, Math.min(cx - TIP_W / 2, window.innerWidth - TIP_W - 8));
+            const bottomFromTop = window.innerHeight - ey + 10;
+            return (
+              <div style={{position:'fixed', left: left+'px', bottom: bottomFromTop+'px', width: TIP_W+'px', pointerEvents:'none', zIndex:9999}}
+                className="rounded-xl shadow-2xl bg-white overflow-hidden border-2 border-cdi-main">
+                <div className="bg-cdi-main text-white px-4 py-2.5">
+                  <p className="text-sm font-black">{hoverPreview.title}</p>
+                  {hoverPreview.sub && <p className="text-xs opacity-80 mt-0.5">{hoverPreview.sub}</p>}
+                </div>
+                {hoverPreview.src ? (
+                  <img src={hoverPreview.src} alt={hoverPreview.title} className="w-full object-cover" style={{height:'380px'}} />
+                ) : (
+                  <div className="w-full flex items-center justify-center bg-gray-50" style={{height:'60px'}}>
+                    <p className="text-gray-300 text-xs">画像未登録</p>
+                  </div>
+                )}
+                {hoverPreview.desc && (
+                  <div className="px-4 py-3 bg-white border-t border-gray-100">
+                    <p className="text-sm text-gray-600 leading-relaxed" style={{whiteSpace:'pre-line'}}>{hoverPreview.desc}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <header className="bg-white shadow-sm border-b border-gray-200">
+            <div className="max-w-6xl mx-auto px-4 py-3 sm:py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <img src="./CDIゴルフ.webp" alt="Company Logo" className="h-8 w-auto object-contain" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {isAdminMode && (
+                    <button onClick={() => setShowAdminPanel(true)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors">
+                      管理者パネル
+                    </button>
+                  )}
+                  <button onClick={() => setShowCart(!showCart)} className="relative px-4 py-2 bg-cdi-main text-white rounded-lg font-semibold hover:bg-cdi-dark transition-colors flex items-center gap-2 shadow-sm">
+                    <ShoppingCart className="w-5 h-5" size={20} /> カート
+                    {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow">{cart.length}</span>}
+                  </button>
+                  <button onClick={() => setShowAdminModal(true)} className="px-3 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold transition-colors">設定</button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="bg-gray-100 border-b border-gray-200 text-gray-600 py-2">
+            <div className="max-w-7xl mx-auto px-4 flex justify-center gap-8 text-sm font-medium">
+              <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-gray-500" size={16} /><span>JFRA防炎認証</span></div>
+              <div className="flex items-center gap-2"><Award className="w-4 h-4 text-gray-500" size={16} /><span>30日品質保証</span></div>
+              <div className="flex items-center gap-2"><Truck className="w-4 h-4 text-gray-500" size={16} /><span>1-2週間以内に配送</span></div>
+            </div>
+          </div>
+
+          <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
+            {!showCart ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  
+                {/* Step 1: Fire Retardant */}
+<div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 border-t-2 border-t-gray-800">
+  <h2 className="text-xl font-bold mb-4 flex items-center gap-3 text-gray-900">
+    <span className="bg-gray-800 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs">1</span>
+    防炎処理の有無
+  </h2>
+  <div className="grid grid-cols-2 gap-4">
+    {/* 비방염품 카드 */}
+    <div onClick={() => setIsFireRetardant(false)} className={`p-4 border-2 rounded-lg cursor-pointer text-center transition-all relative flex flex-col ${!isFireRetardant ? 'border-cdi-main bg-cdi-light' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
+      <p className="font-bold text-lg text-gray-900">非防炎品</p>
+      <p className="text-xl font-bold text-gray-900 mt-2">¥{calculateFabricPrice('low-noise', 2000, false).toLocaleString()}〜</p>
+      <p className="text-[10px] text-gray-400 mt-1">幅2000mm / LN基準</p>
+      {!isFireRetardant && <p className="absolute top-2 right-2 text-xs text-cdi-main font-bold flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-cdi-main text-white flex items-center justify-center" style={{fontSize: '8px'}}>✓</span> 選択中</p>}
+    </div>
+
+    {/* 방염품 카드 */}
+    <div onClick={() => setIsFireRetardant(true)} className={`p-4 border-2 rounded-lg cursor-pointer text-center transition-all relative flex flex-col ${isFireRetardant ? 'border-cdi-main bg-cdi-light' : 'border-gray-100 bg-gray-50 hover:border-gray-300'}`}>
+      <p className="font-bold text-lg text-gray-900">防炎品</p>
+      <p className="text-xs text-gray-500 mt-1">JFRA防炎認証対応</p>
+      <p className="text-xl font-bold text-gray-900 mt-2">¥{calculateFabricPrice('low-noise', 2000, true).toLocaleString()}〜</p>
+      <p className="text-[10px] text-gray-400 mt-1">幅2000mm / LN基準</p>
+      {isFireRetardant && <p className="absolute top-2 right-2 text-xs text-cdi-main font-bold flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-cdi-main text-white flex items-center justify-center" style={{fontSize: '8px'}}>✓</span> 選択中</p>}
+    </div>
+  </div>
+</div>
+
+                {/* Step 2: Fabric Type */}
+                  {screenType !== 'skirtOnly' && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+                          <span className="bg-gray-800 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs">2</span>
+                          生地素材の選択
+                        </h2>
+                        <button onClick={() => setShowFabricGuideModal(true)} className="text-cdi-main hover:text-cdi-dark text-sm font-medium">ガイドを見る</button>
+                      </div>
+                      <div className="mb-6">
+                        {/* 기존 3개의 옵션 카드를 전체 너비로 꽉 차게 복구 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {Object.entries(fabricTypes).map(([key, fabric]) => {
+                            const currentPrice = calculateFabricPrice(key, frontWidth, isFireRetardant);
+                            const isSelected = frontFabricType === key;
+                            return (
+                              <div 
+                                key={key} 
+                                onClick={() => setFrontFabricType(key)}
+                                onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPreview({src: fabricHoverImages[key]||fabricImages[key]||'', title: fabric.name, sub: fabric.tag, desc: fabric.description, x: r.left + r.width/2, y: r.top}); }}
+                                onMouseLeave={() => setHoverPreview(null)}
+                                className={`border-2 rounded-xl p-5 cursor-pointer transition-all flex flex-col ${isSelected ? 'border-cdi-main bg-cdi-light shadow-md' : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-sm'}`}
+                              >
+                                {fabricImages[key] && <img src={fabricImages[key]} alt={fabric.name} className="w-full h-24 object-cover rounded mb-3 border border-gray-200" />}
+                                <p className="text-xs font-bold mb-1.5" style={{color: isSelected ? '#0047AB' : '#6b7280'}}>{fabric.tag}</p>
+                                <h4 className="text-xl font-extrabold mb-2 text-gray-900">{fabric.name}</h4>
+                                <p className="text-sm text-gray-700 mb-4 leading-relaxed flex-grow" style={{whiteSpace:'pre-line'}}>{fabric.description}</p>
+                                <p className="text-xl font-bold text-gray-900">¥{currentPrice.toLocaleString()}</p>
+                                
+                                {isSelected && (
+                                  <div className="mt-2 pt-2 border-t border-cdi-main border-opacity-20">
+                                    <p className="text-xs text-cdi-main font-bold flex items-center gap-1">
+                                      <span className="w-3 h-3 rounded-full bg-cdi-main text-white flex items-center justify-center" style={{fontSize: '8px'}}>✓</span> 選択中
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                    {/* Step 3: Screen Type & Velcro */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+                        <span className="bg-gray-800 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs">3</span>
+                        スクリーン構成の選択
+                      </h2>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-5">
+                      {Object.entries(screenTypes).map(([key, type]) => {
+                        let typePrice = 0;
+                        if (key === 'single') typePrice = calculateFabricPrice(frontFabricType, frontWidth, isFireRetardant);
+                        else if (key === 'double') typePrice = calculateFabricPrice(frontFabricType, frontWidth, isFireRetardant) + calculateFabricPrice(backFabricType, backWidth, isFireRetardant);
+
+                        const isSelected = screenType === key;
+                        return (
+                          <div key={key} onClick={() => {
+                            setScreenType(key);
+                            if (key === 'single') setVelcroSides('none');
+                            else if (velcroSides === 'none') setVelcroSides('3');
+                          }}
+                            onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPreview({src: screenTypeImages[key]||'', title: type.label, sub: type.tag, desc: type.description, x: r.left + r.width/2, y: r.top}); }}
+                            onMouseLeave={() => setHoverPreview(null)}
+                            className={`border-2 rounded-xl p-6 cursor-pointer transition-all flex flex-col ${isSelected ? 'border-cdi-main bg-cdi-light shadow-md' : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-sm'}`}>
+                            <p className="text-xs font-bold mb-1.5" style={{color: isSelected ? '#0047AB' : '#6b7280'}}>{type.tag}</p>
+                            <h3 className="text-xl font-extrabold mb-2 text-gray-900">{type.label}</h3>
+                            <p className="text-sm text-gray-700 mb-3 leading-relaxed flex-grow" style={{whiteSpace:'pre-line'}}>{type.description}</p>
+                            {type.note && (
+                              <p className="text-sm font-bold text-cdi-main mb-3">{type.note}</p>
+                            )}
+                            
+                            <div className="mt-auto">
+                              <p className="text-xl font-bold text-gray-900 mb-2">¥{typePrice.toLocaleString()}</p>
+                              {isSelected && (
+                                <div className="mt-2 pt-2 border-t border-cdi-main border-opacity-20">
+                                  <p className="text-xs text-cdi-main font-bold flex items-center gap-1">
+                                    <span className="w-3 h-3 rounded-full bg-cdi-main text-white flex items-center justify-center" style={{fontSize: '8px'}}>✓</span> 選択中
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Velcro Sides */}
+                    {screenType && (
+                      <div className="mt-6 bg-gray-50 rounded-lg p-5 border border-gray-100">
+                        <p className="font-semibold mb-1 text-gray-800">ベルクロ面数</p>
+                        <div className="mb-4 flex flex-col gap-1.5">
+                          <p className="text-sm font-bold text-gray-700">
+                            {screenType === 'single' ? '1枚スクリーンの場合、ベルクロ「なし」も選択可能です。' : '上・左・右・下の4面にベルクロを付けます。'}
+                          </p>
+                          <p className="text-sm font-bold text-orange-500">※ 幅によって価格が変動します。</p>
+                        </div>
+                        <div className={`grid gap-3 ${screenType === 'single' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                          {screenType === 'single' && (
+                            <div onClick={() => setVelcroSides('none')} className={`p-3 border-2 rounded-lg cursor-pointer text-center transition-all ${velcroSides === 'none' ? 'border-cdi-main bg-white shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                              <p className="font-bold text-gray-900">なし</p><p className="text-xs text-gray-500">ベルクロ不要</p>
+                            </div>
+                          )}
+                          {[
+                            { val: '3', label: '3面', sub: '上・左・右', sides: 3 },
+                            { val: '4', label: '4面', sub: '上・左・右・下', sides: 4 }
+                          ].map(opt => {
+                            const unit = Math.round(frontWidth / 10);
+                            const price = Math.ceil(unit * velcroSidePrice * opt.sides / 100) * 100;
+                            return (
+                            <div key={opt.val} onClick={() => setVelcroSides(opt.val)} className={`p-3 border-2 rounded-lg cursor-pointer text-center transition-all ${velcroSides === opt.val ? 'border-cdi-main bg-white shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                              <p className="font-bold text-gray-900">{opt.label}</p>
+                              <p className="text-xs text-gray-500">{opt.sub}</p>
+                              <p className="text-sm font-bold text-gray-700 mt-1">+¥{price.toLocaleString()}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">現在長さ{frontWidth}mm × {(velcroSidePrice/10).toFixed(2)}円 × {opt.sides}面</p>
+                            </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Velcro Type — 2枚スクリーンでは非表示 */}
+                    {screenType && velcroSides !== 'none' && screenType !== 'double' && (
+                      <div className="mt-3 bg-gray-50 rounded-lg p-5 border border-gray-100">
+                        <p className="font-semibold mb-1 text-gray-800">ベルクロタイプ</p>
+                        <p className="text-xs text-gray-500 mb-4">スクリーンに縫い付けるベルクロの種類です。フレーム側のベルクロに合わせて選んでください。不明な場合はオスをお選びください。</p>
+                        <div className="grid grid-cols-2 gap-4 mt-1">
+                          {[
+                            { val: 'male', label: 'オスベルクロ', icon: '', sub: 'フック状・引っかかりのあるタイプ', note: '迷ったらこちら' },
+                            { val: 'female', label: 'メスベルクロ', icon: '', sub: 'ループ状・輪になっているタイプ', note: 'フレーム側がオスの場合' }
+                          ].map(opt => (
+                            <div key={opt.val} onClick={() => setVelcroType(opt.val)} className={`p-4 border-2 rounded-xl cursor-pointer text-center transition-all flex flex-col ${velcroType === opt.val ? 'border-cdi-main bg-white shadow-md' : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-sm'}`}>
+                              <p className="font-extrabold text-base text-gray-900 mb-1">{opt.label}</p>
+                              <p className="text-sm text-gray-700 mb-1 flex-grow">{opt.sub}</p>
+                              <p className="text-xs font-semibold mt-2" style={{color: velcroType === opt.val ? '#0047AB' : '#9ca3af'}}>{opt.note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Back Fabric */}
+                    {screenType === 'double' && (
+                      <div className="mt-3 bg-gray-50 rounded-lg p-5 border border-gray-100">
+                        <p className="font-semibold mb-1 text-gray-900">裏地</p>
+                        <p className="text-xs text-gray-500 mb-4">2枚スクリーンSETの裏地を選んでください</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {Object.entries(fabricTypes).map(([key, fabric]) => {
+                            const currentPrice = calculateFabricPrice(key, backWidth, isFireRetardant);
+                            const isSelected = backFabricType === key;
+                            return (
+                              <div key={key} onClick={() => setBackFabricType(key)}
+                                onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPreview({src: fabricHoverImages[key]||fabricImages[key]||'', title: fabric.name, sub: fabric.tag, desc: fabric.description, x: r.left + r.width/2, y: r.top}); }}
+                                onMouseLeave={() => setHoverPreview(null)}
+                                className={`border-2 rounded-xl p-4 cursor-pointer text-center transition-all flex flex-col ${isSelected ? 'border-gray-800 bg-white shadow-md' : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-sm'}`}>
+                                {fabricImages[key] && <img src={fabricImages[key]} alt={fabric.name} className="w-full h-16 object-cover rounded mb-2 border border-gray-100" />}
+                                <p className="text-xs font-bold mb-1 text-gray-500">{fabric.tag}</p>
+                                <p className="font-extrabold text-base text-gray-900 mb-1">{fabric.name}</p>
+                                <p className="text-xs text-gray-700 mb-2 leading-relaxed flex-grow" style={{whiteSpace:'pre-line'}}>{fabric.description}</p>
+                                
+                                <div className="mt-auto">
+                                  <p className="text-base font-bold text-gray-900 mb-2">¥{currentPrice.toLocaleString()}</p>
+                                  {isSelected && (
+                                    <div className="mt-2 pt-2 border-t border-gray-800 border-opacity-20">
+                                      <p className="text-xs text-gray-800 font-bold flex items-center gap-1">✓ 選択中</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 4: Options */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 className="text-xl font-bold mb-5 flex items-center gap-3 text-gray-900">
+                      <span className="bg-gray-800 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs">4</span>
+                      オプション設定
+                    </h2>
+
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white">
+                        <label className="flex items-center gap-3 cursor-pointer flex-1">
+                          <input type="checkbox" checked={hasSkirt} onChange={(e) => setHasSkirt(e.target.checked)} className="w-5 h-5 accent-cdi-main" />
+                          <div>
+                            <p className="font-semibold text-gray-900">スカート追加 <span className="text-gray-500 font-medium ml-1">(+¥{calculateSkirtPrice(frontWidth, isFireRetardant).toLocaleString()})</span></p>
+                            <p className="text-xs text-gray-400 mt-0.5">ボール落下防止</p>
+                          </div>
+                        </label>
+                        <button onClick={(e) => { e.stopPropagation(); setShowSkirtGuideModal(true); }} className="text-cdi-main hover:text-cdi-dark text-sm font-medium ml-4">詳細</button>
+                      </div>
+
+                      {hasSkirt && (
+                        <div className="mt-2 ml-4 p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                          <p className="text-xs font-bold text-gray-500 mb-2">スカート取付方法</p>
+                          <div className="flex gap-2">
+                            {[
+                              { val: 'sew', label: '縫い付け' },
+                              { val: 'velcro', label: 'マジックテープ' }
+                            ].map(opt => (
+                              <div key={opt.val} onClick={() => setSkirtAttachment(opt.val)}
+                                className={`flex-1 p-2.5 border-2 rounded-lg cursor-pointer text-center transition-all flex items-center justify-center ${skirtAttachment === opt.val ? 'border-cdi-main bg-white shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                <p className={`text-sm font-bold ${skirtAttachment === opt.val ? 'text-cdi-main' : 'text-gray-700'}`}>{opt.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {hasSkirt && frontWidth > skirtSettings.noSeamMinWidth && (
+                        <div className="mt-2 ml-4 p-3 bg-gray-50 border border-gray-100 rounded-lg flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={skirtNoSeam} onChange={(e) => setSkirtNoSeam(e.target.checked)} className="w-4 h-4 accent-cdi-main" />
+                            <span className="text-sm font-medium text-gray-700">継ぎ目なし加工 <span className="text-gray-500">(+¥{skirtSettings.noSeamAdd.toLocaleString()})</span></span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-100 rounded-lg p-5">
+                        <div className="flex items-center justify-between mb-5 border-b border-gray-200 pb-3">
+                          <div className="flex items-center gap-2"><p className="font-bold text-gray-800">ハトメ（アイレット）設定</p></div>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => setShowEyeletLayoutModal(true)} className="hidden sm:inline px-3 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 rounded-md hover:bg-gray-100 transition-colors">大きく見る</button>
+                            <button onClick={() => setShowEyeletGuideModal(true)} className="text-cdi-main hover:text-cdi-dark text-sm font-medium">ガイド</button>
+                          </div>
+                        </div>
+
+                        {/* ハトメ面数・間隔: 2カラム */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
+
+                          {/* 1. 면수 선택 */}
+                          <div>
+                            <p className="text-xs font-bold mb-2 text-gray-600">ハトメ面数</p>
+                            <div className="grid grid-cols-1 gap-2">
+                              {[
+                                { val: '3', label: '3面', sub: '上・左・右', fee: '' },
+                                { val: '4', label: '4面', sub: '上・下・左・右', fee: `+¥${eyelet4SideFlatFee.toLocaleString()}` }
+                              ].map((opt) => (
+                                <div key={`eyelet-side-${opt.val}`} onClick={() => setEyeletSides(opt.val)} className={`p-2.5 border-2 rounded-lg text-center cursor-pointer transition-all flex flex-col justify-center ${eyeletSides === opt.val ? 'border-cdi-main bg-white shadow-sm text-gray-900' : 'border-transparent bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                                  <p className="font-bold text-sm">{opt.label}</p>
+                                  <p className="text-[10px] text-gray-500 mt-0.5">{opt.sub}</p>
+                                  {opt.fee && <p className="text-[10px] font-bold text-cdi-main mt-0.5">{opt.fee}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 2. 간격 선택 */}
+                          <div>
+                            <p className="text-xs font-bold mb-2 text-gray-600">ハトメ間隔</p>
+                            <div className="grid grid-cols-1 gap-2">
+                              {[200, 300, 400].map((spacing) => (
+                                <div key={`spacing-${spacing}`} onClick={() => setEyeletSpacing(spacing)} className={`p-2.5 border-2 rounded-lg text-center cursor-pointer transition-all flex flex-col justify-center ${eyeletSpacing === spacing ? 'border-cdi-main bg-white shadow-sm text-gray-900' : 'border-transparent bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                                  <p className="font-bold text-sm">{spacing}mm</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* 3. 배치 방식: 전폭 가로 카드 */}
+                        <div>
+                          <p className="text-xs font-bold mb-2 text-gray-600">配置方式</p>
+                          <div className="flex flex-col gap-2">
+                            {[
+                              { val: 'A', label: '方式 A', tag: 'コーナー基準', desc: 'まずコーナーにハトメを配置し、そこから設定した間隔に合わせてハトメを追加していく方式。' },
+                              { val: 'B', label: '方式 B', tag: '間隔均等', desc: '最初から設定した間隔に従い、端から均等にハトメを配置していく方式。' },
+                              { val: 'C', label: '方式 C', tag: '未定', desc: '配置方式は現在検討中です。' }
+                            ].map((opt) => (
+                              <div key={`method-${opt.val}`} onClick={() => setEyeletMethod(opt.val)}
+                                onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPreview({src: eyeletImages[opt.val]||'', title: opt.label, sub: opt.tag, desc: opt.desc, x: r.left + r.width/2, y: r.top}); }}
+                                onMouseLeave={() => setHoverPreview(null)}
+                                className={`flex items-start gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${eyeletMethod === opt.val ? 'border-cdi-main bg-white shadow-sm' : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg flex-shrink-0 ${eyeletMethod === opt.val ? 'bg-cdi-main text-white' : 'bg-gray-200 text-gray-500'}`}>{opt.val}</div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${eyeletMethod === opt.val ? 'bg-cdi-light text-cdi-main border border-cdi-border' : 'bg-gray-200 text-gray-500'}`}>{opt.tag}</span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 leading-relaxed" style={{whiteSpace:'pre-line'}}>{opt.desc}</p>
+                                </div>
+                                {eyeletMethod === opt.val && (
+                                  <span className="text-xs text-cdi-main font-bold flex items-center gap-1 flex-shrink-0">
+                                    <span className="w-3 h-3 rounded-full bg-cdi-main text-white flex items-center justify-center" style={{fontSize:'8px'}}>✓</span> 選択中
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {eyeletLayout && (
+                          <div className="mt-5 pt-4 border-t border-gray-200">
+                            <div className="bg-white rounded-lg p-3 border border-gray-200 text-center shadow-sm">
+                              <p className="text-gray-500 text-[11px] mb-1">対象サイズ ({screenType === 'double' ? '表地' : '前面'})</p>
+                              <p className="font-bold text-xs text-gray-800">W:{Math.round(eyeletLayout.widthMm)} / H:{Math.round(eyeletLayout.heightMm)}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                  </div>
+
+
+                  {/* Step 5: Size */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex flex-col">
+                        <h2 className="text-xl font-bold flex items-center gap-3 text-gray-900">
+                          <span className="bg-gray-800 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs">5</span>
+                          サイズ調整（10mm単位）
+                        </h2>
+                        <p className="text-xs text-orange-500 mt-1 ml-10">※ 6m以上はお問い合わせください</p>
+                      </div>
+                      <button onClick={() => setShowSizeGuideModal(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors border border-gray-200">
+                        <span className="font-medium text-sm text-gray-700">測定ガイド</span>
+                      </button>
+                    </div>
+
+                    {renderSizePanel('front')}
+                    {screenType === 'double' && renderSizePanel('back')}
+
+                  </div>
+                </div>
+
+                {/* Order Summary */}
+                <div className="lg:col-span-1">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-4">
+                    <h2 className="text-lg font-bold mb-5 flex items-center gap-2 text-gray-900 border-b border-gray-100 pb-3">価格</h2>
+                    
+                    <div className="space-y-3 text-sm mb-6 text-gray-600">
+                      <div className="flex justify-between items-center"><span className="text-gray-500">防炎オプション:</span><span className="font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded text-xs">{isFireRetardant ? 'あり' : `なし (-¥${totalPrice.fireDiscount.toLocaleString()})`}</span></div>
+                      <div className="flex justify-between"><span>タイプ:</span><span className="font-medium text-gray-900">{screenType ? screenTypes[screenType].label : '-'}</span></div>
+                      
+                      {screenType && velcroSides !== 'none' && (
+                        <div className="flex justify-between"><span>ベルクロ面数:</span><span className="font-medium text-gray-900">{velcroSides}面 {velcroSides === '4' && <span className="text-gray-400 text-xs ml-1">(+¥{totalPrice.velcroCost.toLocaleString()})</span>}</span></div>
+                      )}
+                      {screenType && velcroSides === 'none' && (
+                        <div className="flex justify-between"><span>ベルクロ:</span><span className="font-medium text-gray-900">なし</span></div>
+                      )}
+                      
+                      <div className="flex justify-between"><span>{screenType === 'double' ? '表地:' : '前面生地:'}</span><span className="font-medium text-gray-900">{fabricTypes[frontFabricType].name}</span></div>
+                      <div className="flex justify-between"><span>{screenType === 'double' ? '表地サイズ:' : 'サイズ:'}</span><span className="font-medium text-gray-900">{frontWidth} × {frontHeight} mm</span></div>
+
+                      {screenType === 'double' && (
+                        <>
+                          <div className="flex justify-between mt-1 border-t border-dashed border-gray-200 pt-1"><span>裏地:</span><span className="font-medium text-gray-900">{fabricTypes[backFabricType].name}</span></div>
+                          <div className="flex justify-between"><span>裏地サイズ:</span><span className="font-medium text-gray-900">{backWidth} × {backHeight} mm</span></div>
+                        </>
+                      )}
+
+                      {hasSkirt && <div className="flex justify-between mt-1 border-t border-dashed border-gray-200 pt-1"><span>スカート:</span><span className="font-medium text-gray-900">+¥{totalPrice.skirtCost.toLocaleString()}</span></div>}
+                      {/* --- v23: 요약창에 方式 표시 추가 --- */}
+                      {eyeletLayout && <div className="flex justify-between"><span>ハトメ ({eyeletSides}面 / {eyeletSpacing}mm / 方式{eyeletMethod}):</span><span className="font-medium text-gray-900">+¥{totalPrice.eyeletCost.toLocaleString()}</span></div>}
+                      <div className="flex justify-between pt-2 border-t border-gray-100 mt-2"><span>数量:</span><span className="font-bold text-gray-900">{screenType === 'double' ? `${quantity}SET (${quantity * 2}枚)` : `${quantity}枚`}</span></div>
+                      <div className="flex justify-between pt-2 border-t border-gray-100 mt-2"><span className="font-bold text-gray-700">現在の金額:</span><span className="font-black text-cdi-main text-base">¥{Math.floor(totalPrice.total).toLocaleString()}</span></div>
+                    </div>
+                    
+                    {/* 우측 패널 장바구니 아이템 목록 (네이버 스마트스토어 스타일) */}
+{cart.length > 0 && (
+  <div className="mt-4 mb-4 border-t border-b border-gray-200 py-3 max-h-60 overflow-y-auto">
+    {cart.map((item) => (
+      <div key={item.id} className="py-3 border-b border-dashed border-gray-200 last:border-0 last:pb-0">
+        <p className="text-sm text-gray-700 mb-2">
+          {item.frontWidth}x{item.frontHeight} / {item.frontFabric} / {item.velcroSides}面ベルクロ
+        </p>
+        <div className="flex justify-between items-center">
+          <div className="flex border border-gray-300 rounded bg-gray-50 h-8">
+            <button onClick={() => updateCartQuantity(item.id, -1)} className="px-3 text-gray-600 hover:bg-gray-200 font-bold">-</button>
+            <div className="px-3 bg-white border-x border-gray-300 text-sm font-bold flex items-center justify-center min-w-[40px]">{item.quantity}</div>
+            <button onClick={() => updateCartQuantity(item.id, 1)} className="px-3 text-gray-600 hover:bg-gray-200 font-bold">+</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => loadCartItemForEdit(item)} className="text-xs px-2 py-1 border border-cdi-main text-cdi-main rounded hover:bg-cdi-light font-bold">修正</button>
+            <span className="font-bold text-gray-900">¥{item.totalPrice.toLocaleString()}</span>
+            <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+{/* 합계 금액 */}
+<div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-100 mt-4">
+  <div className="flex justify-between items-center mb-2">
+    <span className="text-gray-700 text-sm font-bold">合計金額</span>
+    <span className="text-sm text-gray-500">総数量 {cart.reduce((sum, item) => sum + item.quantity * item.sheetMultiplier, 0)}枚</span>
+  </div>
+  <div className="flex justify-end items-end">
+    <span className="text-2xl font-black text-gray-900 tracking-tight">
+      ¥{cart.reduce((sum, item) => sum + item.totalPrice, 0).toLocaleString()}
+    </span>
+  </div>
+</div>
+                    
+                    <button onClick={addToCart} className="w-full bg-cdi-main text-white py-4 rounded-lg font-bold text-lg hover:bg-cdi-dark transition-colors mb-3 shadow-sm">カートに追加</button>
+                    <button onClick={() => setShowCart(true)} className="w-full bg-gray-800 text-white py-4 rounded-lg font-bold text-lg hover:bg-gray-900 transition-colors mb-3">カートを見る ({cart.length})</button>
+                    <button onClick={() => setShowSampleModal(true)} className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-bold text-md hover:bg-gray-50 transition-colors mb-4">無料サンプル申請</button>
+                    
+                    <div className="mt-4 space-y-2 text-sm">
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100"><p className="font-semibold text-gray-600">✓ 30日品質保証</p></div>
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100"><p className="font-semibold text-gray-600">✓ 10万回打撃保証</p></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Cart View
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                  <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-3 text-gray-900"><ShoppingCart className="w-6 h-6" size={24} /> ショッピングカート</h2>
+                    <button onClick={() => setShowCart(false)} className="px-4 py-2 text-sm text-gray-600 font-medium hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">買い物を続ける</button>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-16 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-gray-400 mb-4">カートに商品がありません。</p>
+                      <button onClick={() => setShowCart(false)} className="px-6 py-2.5 bg-cdi-main text-white font-medium rounded-lg hover:bg-cdi-dark transition-colors shadow-sm">商品を選ぶ</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-4 flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm">
+                        <label className="flex items-center gap-2 cursor-pointer pl-2"><input type="checkbox" checked={selectedCartItems.length === cart.length && cart.length > 0} onChange={toggleAllCartItems} className="w-4 h-4 accent-cdi-main"/><span className="font-semibold text-gray-700">全て選択</span></label>
+                        <button onClick={deleteSelectedItems} disabled={selectedCartItems.length === 0} className={`px-3 py-1.5 rounded-md font-medium text-xs transition-colors ${selectedCartItems.length > 0 ? 'text-red-600 hover:bg-red-50' : 'text-gray-400 cursor-not-allowed'}`}>選択削除 ({selectedCartItems.length})</button>
+                      </div>
+
+                      <div className="space-y-3 mb-8">
+                        {cart.map((item, index) => (
+                          <div key={item.id} className={`p-5 rounded-lg transition-all ${selectedCartItems.includes(item.id) ? 'bg-cdi-light border border-cdi-main shadow-sm' : 'bg-white border border-gray-200'}`}>
+                            <div className="flex items-start gap-4">
+                              <input type="checkbox" checked={selectedCartItems.includes(item.id)} onChange={() => toggleCartItem(item.id)} className="w-4 h-4 mt-1 accent-cdi-main" />
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start mb-3">
+                                  <h3 className="font-bold text-lg text-gray-900">オーダーメイド スクリーン <span className="text-xs text-gray-400 font-normal ml-2">#{item.id.toString().slice(-4)}</span></h3>
+                                  <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 font-medium text-sm">削除</button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm text-gray-600 bg-gray-50 p-4 rounded-md">
+                                  <div><span className="text-gray-400 mr-2">防炎加工:</span><span className="font-medium text-gray-800">{item.fireRetardant}</span></div>
+                                  <div><span className="text-gray-400 mr-2">タイプ:</span><span className="font-medium text-gray-800">{item.screenType}</span></div>
+                                  
+                                  {item.velcroSides === 'なし' ? (
+                                    <div><span className="text-gray-400 mr-2">ベルクロ:</span><span className="font-medium text-gray-800">なし</span></div>
+                                  ) : (
+                                    <>
+                                      {item.velcroType && <div><span className="text-gray-400 mr-2">ベルクロ:</span><span className="font-medium text-gray-800">{item.velcroType}</span></div>}
+                                      {item.velcroSides && <div><span className="text-gray-400 mr-2">ベルクロ面数:</span><span className="font-medium text-gray-800">{item.velcroSides}面</span></div>}
+                                    </>
+                                  )}
+                                  
+                                  {item.frontFabric && <div><span className="text-gray-400 mr-2">{item.backFabric ? '表地:' : '前面生地:'}</span><span className="font-medium text-gray-800">{item.frontFabric}</span></div>}
+                                  {item.frontWidth && <div><span className="text-gray-400 mr-2">{item.backFabric ? '表地サイズ:' : 'サイズ:'}</span><span className="font-medium text-gray-800">{item.frontWidth} × {item.frontHeight} mm</span></div>}
+
+                                  {item.backFabric && <div><span className="text-gray-400 mr-2">裏地:</span><span className="font-medium text-gray-800">{item.backFabric}</span></div>}
+                                  {item.backWidth && <div><span className="text-gray-400 mr-2">裏地サイズ:</span><span className="font-medium text-gray-800">{item.backWidth} × {item.backHeight} mm</span></div>}
+                                  
+                                  {(item.hasSkirt || item.skirtCost > 0) && <div><span className="text-gray-400 mr-2">スカート:</span><span className="font-medium text-gray-800">あり</span></div>}
+                                  {/* --- v23: 장바구니 方式 표시 추가 --- */}
+                                  {item.eyeletSpacing && <div className="col-span-2"><span className="text-gray-400 mr-2">ハトメ:</span><span className="font-medium text-gray-800">{item.eyeletSides}面 / {item.eyeletSpacing}mm間隔 / 方式{item.eyeletMethod} ({item.eyeletCount}箇所)</span></div>}
+                                  <div className="col-span-2 border-t border-gray-200 mt-2 pt-2"><span className="text-gray-400 mr-2">数量:</span><span className="font-bold text-gray-900">{item.quantity}枚</span></div>
+                                </div>
+                                <div className="mt-4 flex justify-end items-end gap-3">
+                                  {item.discount > 0 && <span className="text-sm text-cdi-main font-medium">-{item.discount}% OFF</span>}
+                                  <span className="text-2xl font-black text-gray-900">¥{item.totalPrice.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-100">
+                        <div className="flex justify-between items-center"><span className="text-gray-600 font-medium">合計金額</span><span className="text-3xl font-black text-cdi-main tracking-tight">¥{cartTotal.toLocaleString()}</span></div>
+                      </div>
+                      <button onClick={() => {setShowOrderModal(true);}} className="w-full bg-cdi-main text-white py-4 rounded-lg font-bold text-lg hover:bg-cdi-dark transition-colors shadow-sm">注文手続きへ進む</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}      
+          </div>
+          
+          {/* Sample Modal */}
+          {showSampleModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg w-full max-w-md p-8 shadow-xl">
+                <h3 className="text-xl font-bold mb-6 text-gray-900">無料サンプル申請</h3>
+                <div className="space-y-4 mb-8">
+                  <input type="text" placeholder="会社名" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <input type="text" placeholder="お名前" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <input type="email" placeholder="メールアドレス" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <input type="tel" placeholder="電話番号" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <textarea placeholder="お届け先住所" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg h-24 focus:bg-white focus:border-cdi-main outline-none transition-colors resize-none" />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowSampleModal(false)} className="flex-1 bg-white border border-gray-200 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-50 transition-colors">キャンセル</button>
+                  <button className="flex-1 bg-cdi-main text-white py-3 rounded-lg font-bold hover:bg-cdi-dark transition-colors">申請する</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Size Guide Modal */}
+          {showSizeGuideModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSizeGuideModal(false)}>
+              <div className="bg-white rounded-lg max-w-5xl w-full p-8 max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                  <h3 className="text-xl font-bold text-gray-900">サイズ測定ガイド</h3>
+                  <button onClick={() => setShowSizeGuideModal(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-gray-50 rounded-lg p-6 border border-gray-100">
+                      <h4 className="font-bold text-gray-900 mb-2">測定方法</h4>
+                      <p className="text-gray-500 text-sm mb-6">スクリーンを設置する空間を正確に測定してください。</p>
+                      <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
+                        <div className="relative mx-auto" style={{width: '100%', maxWidth: '300px', height: '200px'}}>
+                          <div className="absolute inset-0 border-4 border-gray-800 rounded"></div>
+                          <div className="absolute top-0 left-0 right-0 flex items-center justify-center" style={{top: '-25px'}}>
+                            <div className="flex items-center gap-2"><div className="w-8 h-[1px] bg-gray-400"></div><span className="font-bold text-gray-800 text-xs tracking-widest">幅(W)</span><div className="w-8 h-[1px] bg-gray-400"></div></div>
+                          </div>
+                          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-center" style={{left: '-40px'}}>
+                            <div className="flex flex-col items-center gap-2"><div className="w-[1px] h-8 bg-gray-400"></div><span className="font-bold text-gray-800 text-xs tracking-widest" style={{writingMode: 'vertical-rl'}}>高さ(H)</span><div className="w-[1px] h-8 bg-gray-400"></div></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-1">
+                    <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                      <p className="text-center font-bold text-gray-800 mb-4 text-sm">詳細スペック</p>
+                      <img src="./guide.png" alt="ガイド" className="w-full h-auto rounded border border-gray-200" />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-8 flex justify-center"><button onClick={() => setShowSizeGuideModal(false)} className="px-10 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 transition-colors">閉じる</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* Skirt Guide Modal */}
+          {showSkirtGuideModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSkirtGuideModal(false)}>
+              <div className="bg-white rounded-lg max-w-2xl w-full p-8 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                  <h3 className="text-xl font-bold text-gray-900">スカートとは？</h3>
+                  <button onClick={() => setShowSkirtGuideModal(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-8 text-center">
+                  <p className="text-gray-600 leading-relaxed">ボールが床に直接落ちるのを防ぎ、スクリーンの下段を保護するための布です。</p>
+                </div>
+                <div className="mt-8 flex justify-center"><button onClick={() => setShowSkirtGuideModal(false)} className="px-10 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 transition-colors">閉じる</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* Fabric Guide Modal */}
+          {showFabricGuideModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowFabricGuideModal(false)}>
+              <div className="bg-white rounded-lg w-[90vw] max-w-5xl p-8 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                  <h3 className="text-xl font-bold text-gray-900">生地選びガイド</h3>
+                  <button onClick={() => setShowFabricGuideModal(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                </div>
+                <div className="flex justify-center bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <img src="./fabric_guide.png" alt="生地種類ガイド" className="h-[300px] w-auto object-contain mix-blend-multiply" />
+                </div>
+                <div className="mt-8 flex justify-center"><button onClick={() => setShowFabricGuideModal(false)} className="px-10 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 transition-colors">閉じる</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* Eyelet Guide Modal */}
+          {showEyeletGuideModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowEyeletGuideModal(false)}>
+              <div className="bg-white rounded-lg max-w-2xl w-full p-8 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                  <h3 className="text-xl font-bold text-gray-900">ハトメ（アイレット）とは？</h3>
+                  <button onClick={() => setShowEyeletGuideModal(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-8 text-center">
+                  <p className="text-gray-600">スクリーンをフレームにロープやバンドで固定するための穴です。</p>
+                </div>
+                <div className="mt-8 flex justify-center"><button onClick={() => setShowEyeletGuideModal(false)} className="px-10 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 transition-colors">閉じる</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* Eyelet Layout Simulator Modal */}
+          {showEyeletLayoutModal && eyeletLayout && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowEyeletLayoutModal(false)}>
+              <div className="bg-white rounded-lg max-w-4xl w-full p-8 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+                  <h3 className="text-xl font-bold text-gray-900">ハトメ配置イメージ (方式{eyeletMethod})</h3>
+                  <button onClick={() => setShowEyeletLayoutModal(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 flex justify-center">
+                  <svg viewBox="0 0 1000 760" className="w-full max-w-2xl h-auto" role="img">
+                    {/* 생지 종류 라벨 (상단) */}
+                    <text x="500" y="38" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#0047AB">
+                      {`生地: ${fabricTypes[screenType === 'double' ? frontFabricType : frontFabricType].name}${screenType === 'double' ? ` / 裏: ${fabricTypes[backFabricType].name}` : ''}`}
+                    </text>
+                    {/* 벨크로 타입 라벨 (상단 우측) */}
+                    <text x="920" y="38" textAnchor="end" fontSize="15" fill="#374151">
+                      {velcroSides === 'none' ? 'ベルクロなし' : `${velcroType === 'male' ? 'オス' : 'メス'}ベルクロ ${velcroSides}面`}
+                    </text>
+                    <rect x="80" y="55" width="840" height="540" fill="#ffffff" stroke="#1f2937" strokeWidth="4" rx="4" />
+                    {/* 치수 라벨 */}
+                    <text x="500" y="49" textAnchor="middle" fontSize="11" fill="#9ca3af">{`W: ${eyeletLayout.widthMm}mm  H: ${eyeletLayout.heightMm}mm`}</text>
+                    {eyeletLayout.top.map((pos, idx) => <circle key={`top-${idx}`} cx={80 + (pos / eyeletLayout.widthMm) * 840} cy={55} r="8" fill="#ffffff" stroke="#0047AB" strokeWidth="2" />)}
+                    {eyeletLayout.bottom.map((pos, idx) => <circle key={`bottom-${idx}`} cx={80 + (pos / eyeletLayout.widthMm) * 840} cy={595} r="8" fill="#ffffff" stroke="#0047AB" strokeWidth="2" />)}
+                    {eyeletLayout.left.map((pos, idx) => <circle key={`left-${idx}`} cx={80} cy={55 + (pos / eyeletLayout.heightMm) * 540} r="8" fill="#ffffff" stroke="#0047AB" strokeWidth="2" />)}
+                    {eyeletLayout.right.map((pos, idx) => <circle key={`right-${idx}`} cx={920} cy={55 + (pos / eyeletLayout.heightMm) * 540} r="8" fill="#ffffff" stroke="#0047AB" strokeWidth="2" />)}
+                    {/* 하단 범례 */}
+                    <circle cx="110" cy="650" r="8" fill="#ffffff" stroke="#0047AB" strokeWidth="2" />
+                    <text x="126" y="655" fontSize="14" fill="#374151">ハトメ位置</text>
+                    <text x="500" y="655" textAnchor="middle" fontSize="13" fill="#6b7280">{`間隔: ${eyeletSpacing}mm  /  ${eyeletSides}面固定`}</text>
+                  </svg>
+                </div>
+                <div className="mt-8 flex justify-center"><button onClick={() => setShowEyeletLayoutModal(false)} className="px-10 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 transition-colors">閉じる</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Login Modal */}
+          {showAdminModal && !isAdminMode && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg max-w-sm w-full p-8 shadow-xl">
+                <h3 className="text-xl font-bold mb-6 text-gray-900 text-center">管理者ログイン</h3>
+                <div className="space-y-4 mb-8">
+                  <input type="text" value={adminId} onChange={(e) => setAdminId(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors text-sm" placeholder="ID" />
+                  <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors text-sm" placeholder="Password" onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()} />
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button onClick={handleAdminLogin} className="w-full bg-cdi-main text-white py-3 rounded-lg font-bold hover:bg-cdi-dark transition-colors">ログイン</button>
+                  <button onClick={() => { setShowAdminModal(false); setAdminId(''); setAdminPw(''); }} className="w-full bg-white text-gray-500 py-3 rounded-lg font-medium hover:text-gray-800 transition-colors border border-gray-200">キャンセル</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Panel Modal */}
+          {showAdminPanel && isAdminMode && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
+                <div className="sticky top-0 bg-white border-b border-gray-100 p-6 z-10">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-gray-900">管理者パネル</h3>
+                    <button onClick={() => setShowAdminPanel(false)} className="text-gray-400 hover:text-gray-900 text-2xl transition-colors">✕</button>
+                  </div>
+                </div>
+
+                <div className="p-8 space-y-8 bg-gray-50">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-1 text-gray-800 tracking-wider">生地素材 — 画像設定</h4>
+                    <p className="text-xs text-gray-400 mb-4">カード内表示用とマウスオーバー時の画像を別々に設定できます</p>
+                    <div className="space-y-4">
+                      {Object.entries(fabricTypes).map(([key, fabric]) => (
+                        <div key={key} className="p-4 border border-gray-100 rounded-lg bg-gray-50">
+                          <h5 className="font-bold text-sm mb-3 text-gray-900">{fabric.name} <span className="text-xs text-gray-400 font-normal">{fabric.tag}</span></h5>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[11px] font-bold text-gray-500 mb-1.5">📷 カード内表示用</p>
+                              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(key, e)} className="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 w-full" />
+                              {fabricImages[key] && <div className="mt-2 w-full h-14 border border-gray-200 rounded bg-white overflow-hidden"><img src={fabricImages[key]} alt={fabric.name} className="w-full h-full object-cover" /></div>}
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-bold text-gray-500 mb-1.5">🔍 ホバー時プレビュー用</p>
+                              <input type="file" accept="image/*" onChange={(e) => handleFabricHoverImageUpload(key, e)} className="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 w-full" />
+                              {fabricHoverImages[key] && <div className="mt-2 w-full h-14 border border-blue-200 rounded bg-white overflow-hidden"><img src={fabricHoverImages[key]} alt={fabric.name} className="w-full h-full object-cover" /></div>}
+                              {!fabricHoverImages[key] && <p className="text-[10px] text-gray-300 mt-1">未設定の場合、カード用画像を使用</p>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-1 text-gray-800 tracking-wider">スクリーン構成 — ホバー画像</h4>
+                    <p className="text-xs text-gray-400 mb-4">1枚・2枚それぞれのイメージ写真を登録</p>
+                    <div className="space-y-3">
+                      {[{key:'single', label:'1枚スクリーン'}, {key:'double', label:'2枚スクリーンSET'}].map(({key, label}) => (
+                        <div key={key} className="flex items-center gap-4 p-3 border border-gray-100 rounded bg-gray-50">
+                          <div className="flex-1"><h5 className="font-bold text-sm mb-1 text-gray-900">{label}</h5><input type="file" accept="image/*" onChange={(e) => handleScreenTypeImageUpload(key, e)} className="text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" /></div>
+                          {screenTypeImages[key] && <div className="w-16 h-16 border border-gray-200 rounded bg-white overflow-hidden flex-shrink-0"><img src={screenTypeImages[key]} alt={label} className="w-full h-full object-cover" /></div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-1 text-gray-800 tracking-wider">ハトメ方式 — ホバー画像</h4>
+                    <p className="text-xs text-gray-400 mb-4">方式A・B・Cの配置説明図などを登録</p>
+                    <div className="space-y-3">
+                      {[{key:'A', label:'方式A — コーナー基準'}, {key:'B', label:'方式B — 間隔均等'}, {key:'C', label:'方式C — 未定'}].map(({key, label}) => (
+                        <div key={key} className="flex items-center gap-4 p-3 border border-gray-100 rounded bg-gray-50">
+                          <div className="flex-1"><h5 className="font-bold text-sm mb-1 text-gray-900">{label}</h5><input type="file" accept="image/*" onChange={(e) => handleEyeletImageUpload(key, e)} className="text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" /></div>
+                          {eyeletImages[key] && <div className="w-16 h-16 border border-gray-200 rounded bg-white overflow-hidden flex-shrink-0"><img src={eyeletImages[key]} alt={label} className="w-full h-full object-cover" /></div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-4 text-gray-800 tracking-wider">価格計算パラメータ</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">LN 基準単価</label><input type="number" step="0.1" value={fabricPriceSettings.basePricePerMm} onChange={(e) => setFabricPriceSettings({...fabricPriceSettings, basePricePerMm: parseFloat(e.target.value)||0})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">DP 割増率</label><input type="number" step="0.01" value={fabricPriceSettings.dpMultiplier} onChange={(e) => setFabricPriceSettings({...fabricPriceSettings, dpMultiplier: parseFloat(e.target.value)||1})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">SDP 割増率</label><input type="number" step="0.01" value={fabricPriceSettings.sdpMultiplier} onChange={(e) => setFabricPriceSettings({...fabricPriceSettings, sdpMultiplier: parseFloat(e.target.value)||1})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-4 text-gray-800 tracking-wider">オプション単価</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">防炎なし 割引率 (%)</label><input type="number" value={fireDiscountRate} onChange={(e) => setFireDiscountRate(parseInt(e.target.value)||0)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-1 text-gray-500">ベルクロ4面下辺 追加 (¥/10mm)</label><p className="text-[10px] text-gray-400 mb-1.5">50m=₩75,000 → 1.5¥/10mm が基準</p><input type="number" value={velcroSidePrice} onChange={(e) => setVelcroSidePrice(parseInt(e.target.value)||0)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">4面 固定追加料金 (¥)</label><input type="number" value={eyelet4SideFlatFee} onChange={(e) => setEyelet4SideFlatFee(parseInt(e.target.value)||0)} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-sm font-bold mb-4 text-gray-800 tracking-wider">スカート設定</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">基準幅(mm)</label><input type="number" value={skirtSettings.baseWidthMm} onChange={(e) => setSkirtSettings({...skirtSettings, baseWidthMm: parseInt(e.target.value)||1})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">基準価格(¥)</label><input type="number" value={skirtSettings.basePriceYen} onChange={(e) => setSkirtSettings({...skirtSettings, basePriceYen: parseInt(e.target.value)||0})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">無縫製 追加(¥)</label><input type="number" value={skirtSettings.noSeamAdd} onChange={(e) => setSkirtSettings({...skirtSettings, noSeamAdd: parseInt(e.target.value)||0})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                      <div><label className="block text-xs font-semibold mb-2 text-gray-500">無縫製 最小幅</label><input type="number" value={skirtSettings.noSeamMinWidth} onChange={(e) => setSkirtSettings({...skirtSettings, noSeamMinWidth: parseInt(e.target.value)||0})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded focus:bg-white focus:border-cdi-main outline-none text-sm" /></div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="text-sm font-bold text-gray-800 tracking-wider">数量割引ルール</h4>
+                      <button onClick={() => { const maxMin = discountTiers.length > 0 ? Math.max(...discountTiers.map(t=>t.minQty)) : 0; setDiscountTiers([...discountTiers, { id: Date.now(), minQty: maxMin + 10, maxQty: null, rate: 0 }]); }} className="px-3 py-1.5 bg-cdi-main text-white rounded text-xs font-bold hover:bg-cdi-dark">追加</button>
+                    </div>
+                    <div className="space-y-3">
+                      {[...discountTiers].sort((a,b) => a.minQty - b.minQty).map((tier) => (
+                        <div key={tier.id} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded">
+                          <div className="flex-1 grid grid-cols-3 gap-4">
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Min Qty</label><input type="number" value={tier.minQty} onChange={(e) => setDiscountTiers(discountTiers.map(t => t.id===tier.id ? {...t, minQty: parseInt(e.target.value)||0} : t))} className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm outline-none focus:border-cdi-main" /></div>
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Max Qty</label><input type="number" value={tier.maxQty ?? ''} placeholder="∞" onChange={(e) => setDiscountTiers(discountTiers.map(t => t.id===tier.id ? {...t, maxQty: e.target.value===''?null:parseInt(e.target.value)||0} : t))} className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm outline-none focus:border-cdi-main" /></div>
+                            <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Discount (%)</label><input type="number" value={tier.rate} onChange={(e) => setDiscountTiers(discountTiers.map(t => t.id===tier.id ? {...t, rate: parseInt(e.target.value)||0} : t))} className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm outline-none focus:border-cdi-main" /></div>
+                          </div>
+                          <button onClick={() => { if (discountTiers.length > 1) setDiscountTiers(discountTiers.filter(t => t.id !== tier.id)); }} className="p-2 text-gray-400 hover:text-red-500 mt-4">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-white border-t border-gray-100 p-6 flex justify-between">
+                  <button onClick={() => { setIsAdminMode(false); setShowAdminPanel(false); alert('管理者モードを終了しました'); }} className="px-6 py-2.5 text-red-600 font-bold hover:bg-red-50 rounded transition-colors">ログアウト</button>
+                  <button onClick={() => setShowAdminPanel(false)} className="px-8 py-2.5 bg-cdi-main text-white rounded font-bold hover:bg-cdi-dark transition-colors shadow-sm">保存</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Order Modal */}
+          {showOrderModal && (
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg max-w-sm w-full p-8 shadow-xl text-center">
+                <h3 className="text-xl font-bold mb-2 text-gray-900">注文手続き</h3>
+                <p className="text-sm text-gray-500 mb-8">決済画面へ移動します。</p>
+                <div className="flex flex-col gap-3">
+                  <button onClick={() => alert('決済画面へ移動します')} className="w-full bg-cdi-main text-white py-3 rounded-lg font-bold hover:bg-cdi-dark transition-colors shadow-sm">決済へ進む</button>
+                  <button onClick={() => setShowOrderModal(false)} className="w-full bg-white text-gray-500 py-3 rounded-lg font-medium hover:text-gray-800 transition-colors border border-gray-200">キャンセル</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<GolfScreenShop />, document.getElementById('root'));
+  </script>
+</body>
+</html>
