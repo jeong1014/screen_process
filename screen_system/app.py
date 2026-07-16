@@ -36,7 +36,7 @@ from print_templates import render_inventory_label, render_order_label, render_s
 # ===== 設定 =====
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1234@localhost:5432/screen")
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
-MAX_STAGE = 8
+MAX_STAGE = 6
 
 app = FastAPI(title="スクリーン原団 工程管理 v2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
