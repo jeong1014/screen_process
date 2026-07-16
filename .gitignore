@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 백업/임시 파일
+*.bak
+*.bak2
+*.bak3
+*.tmp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+
+# (선택) DB 덤프를 저장소에 넣지 않으려면 아래 주석 해제
+# backup.sql
