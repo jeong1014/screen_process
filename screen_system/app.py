@@ -210,6 +210,30 @@ def page_shop():
     base = os.path.dirname(os.path.abspath(__file__))
     return FileResponse(os.path.join(base, "detail_sizeGuide_v26.html"))
 
+@app.get("/shipping-slip/{barcode}")
+def page_shipping_slip(barcode: str):
+    # ハトメ完了時などに開く送り状(印刷)ページ。barcode から注文を引いて表示する。
+    return FileResponse(os.path.join(FRONTEND_DIR, "shipping_slip.html"))
+
+
+@app.get("/api/shipping-slip/{barcode}")
+def api_shipping_slip(barcode: str):
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT o.id, o.order_no, o.customer_name, o.postal_code, o.address,
+                              o.phone, o.channel, o.payment_status
+                       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+                       WHERE oi.barcode = %s""", (barcode,))
+        o = cur.fetchone()
+        if not o:
+            raise HTTPException(404, f"注文が見つかりません: {barcode}")
+        cur.execute("""SELECT barcode, fabric_type, width_mm, height_mm
+                       FROM order_items WHERE order_id = %s ORDER BY item_no""", (o["id"],))
+        items = [{"barcode": r["barcode"], "fabric": r["fabric_type"],
+                  "size": size_str(r["width_mm"], r["height_mm"])} for r in cur.fetchall()]
+    return {"order_no": o["order_no"], "customer_name": o["customer_name"],
+            "postal_code": o["postal_code"], "address": o["address"], "phone": o["phone"],
+            "channel": o["channel"], "payment_status": o["payment_status"], "items": items}
+
 
 # =============================================================================
 # 入力: 注文全体(顧客+明細)  POST /api/orders

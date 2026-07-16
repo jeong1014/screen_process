@@ -100,6 +100,7 @@ const NONE = ["なし","無し","無","-","—",""];
 const RESULT_HOLD_MS = 15000;  // 完了/開始画面を表示し続ける時間(この後は自動でアイドル画面に戻る)
 let lastShownAt = 0;
 let initialShown = false;  // ページを開いた直後の1回だけ「最終結果」を表示するためのフラグ
+let lastSig = null;        // 直近に大画面表示したスキャンの署名(バーコード@時刻)。重複表示を防ぐ。
 
 async function load(){
   try{
@@ -117,14 +118,20 @@ async function load(){
     // 「big」表示はページを開いた直後の1回、またはスキャン直後(doScan側で表示済み)にのみ更新する。
     // ここで毎回 d.last を再表示すると、15秒経ってアイドルに戻した直後にまた同じ結果が
     // 表示されてしまい、いつまでも完了画面が固定されているように見えるため。
-    if(!lastShownAt && !initialShown){
-      initialShown = true;
-      // ★バグ修正: ここで lastShownAt を設定していなかったため、ページを開いた/更新した直後に
-      // d.last(直前の完了結果)が表示されると15秒タイマーが一度も起動せず、
-      // 再読み込みするたびに完了画面がずっと固定されたままになっていた。
-      if(d.last){ showResult(d.last, "最終 "+d.last.at); lastShownAt = Date.now(); }
-      else showIdle();
+    // どの端末でスキャンされても、最新のスキャン結果(d.last)を大画面に反映する。
+    // 署名(バーコード@時刻)が前回表示と変わった時だけ表示し、15秒タイマーを起動する。
+    // これで、この画面の doScan を経由しないスキャン(別のタブレット等)でも情報が出る。
+    if(d.last){
+      const sig = d.last.barcode + "@" + d.last.at;
+      if(sig !== lastSig){
+        lastSig = sig;
+        showResult(d.last, (d.last.result || "") + " " + d.last.at);
+        lastShownAt = Date.now();
+      }
+    } else if(!initialShown){
+      showIdle();
     }
+    initialShown = true;
   }catch(e){}
 }
 function renderList(id, arr){
@@ -194,7 +201,13 @@ async function doScan(code){
   try{
     const d = await fetch("/api/monitor/"+PROC+"/scan",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({barcode:code})}).then(r=>r.json());
-    if(d.ok) showResult(d, null); else showErr(d);
+    if(d.ok){
+      showResult(d, null);
+      // ハトメ工程で「完了」したら、その注文の送り状を自動で開いて印刷する
+      if(PROC==='eyelet' && d.result==='完了' && d.barcode){
+        window.open('/shipping-slip/'+encodeURIComponent(d.barcode), '_blank');
+      }
+    } else showErr(d);
     lastShownAt = Date.now();
     load();
   }catch(e){ showErr({reason:"通信エラー"}); }
