@@ -365,16 +365,16 @@ def create_order(order: OrderIn):
                 created.append(insert_item(seq, barcode, it, it.fabric_type,
                                             it.width_mm, it.height_mm, None, None))
         conn.commit()
-    for barcode in created:
-        # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
-        cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
-        item_row = cur.fetchone()
-        
-        # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
-        item_data = worker_payload(item_row)
-        
-        html_content = render_order_label(item_data)
-        silent_print_html(html_content, "order_printer")
+        for barcode in created:
+            # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
+            cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
+            item_row = cur.fetchone()
+            
+            # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
+            item_data = worker_payload(item_row)
+            
+            html_content = render_order_label(item_data)
+            silent_print_html(html_content, "order_printer")
     return {"order_no": order_no, "barcodes": created}
 
 
