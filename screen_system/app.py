@@ -1878,7 +1878,27 @@ def _serial_reader_worker(config):
                                     body = MonScan(barcode=barcode_data)
                                     result = api_monitor_scan(proc, body)
                                     print(f"✅ [{port}] 모니터 스캔 처리 완료: {result}")
-                                    
+                                    if result.get("ok") and result.get("stage_name") == "ハトメ完了":
+                                        print(f"📦 [{port}] 제품 {barcode_data} 최종 공정 완료 -> 송장 자동 출력 개시")
+                                        
+                                        with db() as conn, conn.cursor() as cur:
+                                            # 제품 및 주문 정보 가져오기
+                                            cur.execute("SELECT order_no, order_id FROM order_items WHERE barcode=%s", (barcode_data,))
+                                            item_info = cur.fetchone()
+                                            
+                                            if item_info:
+                                                order_no = item_info["order_no"]
+                                                cur.execute("SELECT * FROM orders WHERE order_no=%s", (order_no,))
+                                                order_info = cur.fetchone() or {}
+                                                
+                                                # 해당 주문의 전체 제품 목록 가져오기
+                                                cur.execute("SELECT barcode, fabric_type as fabric, width_mm, height_mm FROM order_items WHERE order_id=%s", (item_info["order_id"],))
+                                                items_db = cur.fetchall()
+                                                items_list = [{"barcode": i["barcode"], "fabric": i["fabric"], "size": f"W{i['width_mm']}xH{i['height_mm']}"} for i in items_db]
+                                                
+                                                # HTML 생성 및 출력
+                                                html_content = render_shipping_slip(order_no=order_no, order_info=order_info, items=items_list)
+                                                silent_print_html(html_content, "invoice_printer")
                                 elif scan_type == "worker":
                                     result = _move(barcode_data, +1)
                                     print(f"✅ [{port}] 작업자 스캔 처리 완료: {result['order_no']} (Stage: {result['stage']})")
