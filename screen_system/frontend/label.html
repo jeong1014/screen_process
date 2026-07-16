@@ -306,12 +306,13 @@
       letter-spacing: 0.2mm;
     }
 
-    /* Gorilla Impact Screen ブランドロゴ — Design and Quality の直後に配置 */
+    /* Gorilla Impact Screen ブランドロゴ — Design and Quality の直後、ラベル幅いっぱいに配置 */
     .foot .brand-logo {
       display: block;
-      width: 62mm;
+      width: 100mm;          /* ラベル内容幅(94mm)+左右パディングへ約3mmずつ食い込ませて“ほぼ全幅”に */
+      max-width: none;
       height: auto;
-      margin: 2.2mm auto 0;
+      margin: 2.6mm -3mm 0;  /* 左右パディング(8mm)の一部を相殺して中央で全幅に見せる */
     }
 
     /* ハトメ(円) — Design and Quality の直下に詰めて配置 */
