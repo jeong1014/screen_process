@@ -111,6 +111,59 @@ function go(t){ [...document.querySelectorAll(".tabs button")].forEach(b=>b.clas
 if(PW){ document.getElementById("gate").style.display="none"; boot(); }
 function closeModal(){ document.getElementById("modal").style.display="none"; }
 const RENDER={};
+let CURRENT_ORDER=null, CURRENT_ITEMS=[];
+
+// ===== 送り状(出荷ラベル)プレビュー — デモ =====
+// 注文の宛先情報(氏名/郵便/住所/電話)が送り状に反映されることを示すための簡易プレビュー。
+// 実運用では BizLogi/佐川の送り状フォーマットに置き換える。
+function shippingSlipPreview(){
+  const o=CURRENT_ORDER; if(!o){ alert("注文が選択されていません"); return; }
+  const items=CURRENT_ITEMS||[];
+  const e2=c=>(c==null?"":String(c)).replace(/[<>&]/g,x=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[x]));
+  const pkg=(items.length||1);
+  const w=window.open("","_blank","width=520,height=760");
+  w.document.write(`<html><head><meta charset="utf-8"><title>送り状 ${e2(o.order_no)}</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:"Yu Gothic UI","Noto Sans JP",sans-serif;margin:0;padding:18px;color:#111}
+      .slip{border:2px solid #111;border-radius:6px;max-width:460px;margin:0 auto}
+      .hd{background:#111;color:#fff;padding:8px 12px;font-weight:800;font-size:15px;display:flex;justify-content:space-between}
+      .sec{padding:10px 14px;border-bottom:1px dashed #999}
+      .lbl{font-size:11px;color:#666;margin-bottom:2px} .val{font-size:15px;font-weight:700}
+      .big{font-size:20px;letter-spacing:1px} .row{display:flex;gap:14px} .row>div{flex:1}
+      .foot{padding:8px 14px;font-size:11px;color:#666;display:flex;justify-content:space-between}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+      th,td{border:1px solid #bbb;padding:3px 5px;text-align:left} th{background:#eee}
+      @media print{ .noprint{display:none} }
+    </style></head><body>
+    <div class="slip">
+      <div class="hd"><span>送り状 (SHIPPING SLIP)</span><span>${e2(o.order_no)}</span></div>
+      <div class="sec">
+        <div class="lbl">お届け先 / TO</div>
+        <div class="val big">〒 ${e2(o.postal_code||"—")}</div>
+        <div class="val">${e2(o.address||"住所未登録")}</div>
+        <div class="val" style="margin-top:6px">${e2(o.customer_name||"")} 様</div>
+        <div class="val">TEL: ${e2(o.phone||"—")}</div>
+      </div>
+      <div class="sec row">
+        <div><div class="lbl">ご依頼主 / FROM</div><div class="val">株式会社シーディアイ</div>
+          <div style="font-size:12px">〒491-0000 愛知県一宮市</div></div>
+        <div><div class="lbl">個口数</div><div class="val big">${pkg}</div>
+          <div class="lbl" style="margin-top:6px">発行日</div><div class="val">${new Date().toLocaleDateString()}</div></div>
+      </div>
+      <div class="sec">
+        <div class="lbl">内容品 / ITEMS</div>
+        <table><tr><th>製品番号</th><th>生地</th><th>サイズ</th></tr>
+          ${items.length?items.map(it=>`<tr><td>${e2(it.barcode)}</td><td>${e2(it.fabric)}</td><td>${e2(it.size)}</td></tr>`).join(""):`<tr><td colspan="3">明細なし</td></tr>`}
+        </table>
+      </div>
+      <div class="foot"><span>チャネル: ${e2(o.channel||"")}</span><span>決済: ${e2(o.payment_status||"")}</span></div>
+    </div>
+    <div class="noprint" style="text-align:center;margin-top:14px">
+      <button onclick="window.print()" style="padding:8px 18px;font-weight:700;cursor:pointer">🖨 印刷</button>
+    </div>
+  </body></html>`);
+  w.document.close(); w.focus();
+}
 
 // ===== 画面ランチャー(作業者/モニター等を別タブで開く) =====
 RENDER.screens=()=>{
@@ -152,7 +205,7 @@ RENDER.orders=()=>{
   document.getElementById("main").innerHTML=`<div class="panel"><h2>注文内訳</h2>
     <div class="row" style="margin-bottom:12px">
       <div><label class="f">検索(注文番号/顧客)</label><input id="fq" placeholder="ORD-... / 山田"></div>
-      <div><label class="f">チャネル</label><select id="fch"><option value="">全部</option><option>rakuten</option><option>amazon</option><option>yahoo</option><option>base_ec</option></select></div>
+      <div><label class="f">チャネル</label><select id="fch"><option value="">全部</option><option>self</option><option>rakuten</option><option>amazon</option><option>yahoo</option><option>base_ec</option></select></div>
       <div><label class="f">決済</label><select id="fpay"><option value="">全部</option><option>paid</option><option>pending</option><option>unpaid</option></select></div>
       <div><label class="f">状態</label><select id="fst"><option value="">全部</option><option>confirmed</option><option>production</option><option>shipped</option><option>closed</option><option>cancelled</option></select></div>
       <div><label class="f">期間</label><input id="fdf" type="date"> ~ <input id="fdt" type="date"></div>
@@ -180,6 +233,7 @@ async function loadOrders(){
 async function orderDetail(no){
   try{
     const d=await api("/api/admin/orders/"+encodeURIComponent(no)); const o=d.order;
+    CURRENT_ORDER=o; CURRENT_ITEMS=d.items||[];
     const items=d.items.map(it=>`<tr>
       <td><b>${esc(it.barcode)}</b></td><td><span class="fb ${it.fabric}">${it.fabric}</span></td><td>${esc(it.size)}</td>
       <td>${esc(it.product_type)}×${it.quantity}</td>
@@ -195,6 +249,7 @@ async function orderDetail(no){
         <div><label class="f">BizLogi連携</label><select id="sh_bizlogi">${['not_requested','requested','issued','failed'].map(x=>`<option value="${x}" ${x===ship.bizlogi_status?'selected':''}>${BIZ_JA[x]}</option>`).join("")}</select></div>
         <div><label class="f">個口数</label><input id="sh_pkg" type="number" min="1" value="${ship.package_count||1}" style="width:70px"></div>
         <button class="b b-pri" onclick="saveShipment('${esc(o.order_no)}')">出荷情報を保存</button>
+        <button class="b b-gray" onclick="shippingSlipPreview()">🖨 送り状プレビュー(デモ)</button>
       </div>${ship.shipment_no?`<div class="muted" style="margin-top:8px">送り状番号: ${esc(ship.shipment_no)}</div>`:`<div class="muted" style="margin-top:8px">まだ出荷レコードがありません。保存すると新規作成されます。</div>`}`;
     document.getElementById("modalBody").innerHTML=`
       <div style="display:flex;align-items:center"><h2 style="margin:0;flex:1">${esc(o.order_no)}</h2><button class="b b-gray" onclick="closeModal()">閉じる</button></div>

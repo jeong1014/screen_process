@@ -203,6 +203,13 @@ def page_worker():
 def page_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
 
+@app.get("/shop")
+def page_shop():
+    # 販売サイトの商品ページ(detail_sizeGuide_v26.html)を同一オリジンで配信。
+    # ここから「注文を確定」すると POST /api/orders でDBに登録される。
+    base = os.path.dirname(os.path.abspath(__file__))
+    return FileResponse(os.path.join(base, "detail_sizeGuide_v26.html"))
+
 
 # =============================================================================
 # 入力: 注文全体(顧客+明細)  POST /api/orders

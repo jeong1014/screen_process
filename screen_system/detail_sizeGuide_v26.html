@@ -116,6 +116,13 @@
       const [showCart, setShowCart] = useState(false);
       const [cart, setCart] = useState([]);
       const [selectedCartItems, setSelectedCartItems] = useState([]);
+      // --- 注文をDBへ登録するための顧客情報 / 送信状態 ---
+      const API_BASE = ""; // /shop で同一オリジン配信のため空。別サーバーなら "http://localhost:8000"
+      const [custName, setCustName] = useState('');
+      const [custPhone, setCustPhone] = useState('');
+      const [custPostal, setCustPostal] = useState('');
+      const [custAddress, setCustAddress] = useState('');
+      const [submitting, setSubmitting] = useState(false);
       const [showEyeletGuideModal, setShowEyeletGuideModal] = useState(false); 
       const [showFabricGuideModal, setShowFabricGuideModal] = useState(false);
       const [showEyeletLayoutModal, setShowEyeletLayoutModal] = useState(false);
@@ -363,6 +370,84 @@
         };
       }, [screenType, frontFabricType, backFabricType, frontWidth, frontHeight, backWidth, backHeight, hasSkirt, skirtNoSeam, quantity, isFireRetardant, eyeletLayout, velcroSides, eyeletSides, fabricPriceSettings, fireDiscountRate, eyelet4SideFlatFee, velcroSidePrice, skirtSettings, discountTiers]);
 
+      // 現在の選択状態を、バックエンド(POST /api/orders の ItemIn)が期待する形へ変換する。
+      // - product_type: single / two_sheet_set(=2枚SET) / skirt(=スカートのみ)
+      // - ハトメは辺(top/bottom/left/right)ごとの process="eyelet" + 間隔mm で表現。
+      //     3辺=上/左/右、4辺=それに下を追加(価格計算の useBottom と同じ規則)。
+      // - スカートは下辺(process_bottom="skirt")として表現(ハトメ下辺より優先)。
+      // - ベルクロは辺ごとには載せず、item単位の velcro_type(オス/メス)で保持。
+      const buildItemSpec = () => {
+        const fabName = ft => (fabricTypes[ft] ? fabricTypes[ft].name : 'LN');
+        const pt = screenType === 'double' ? 'two_sheet_set'
+                 : (screenType === 'skirtOnly' ? 'skirt' : 'single');
+        const proc = { top: 'none', bottom: 'none', left: 'none', right: 'none' };
+        const pmm  = { top: null, bottom: null, left: null, right: null };
+        if (screenType !== 'skirtOnly') {
+          const es = eyeletSides === '4' ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right'];
+          es.forEach(s => { proc[s] = 'eyelet'; pmm[s] = eyeletSpacing; });
+        }
+        if (hasSkirt) { proc.bottom = 'skirt'; pmm.bottom = null; }
+        return {
+          product_type: pt,
+          fabric_type: fabName(frontFabricType),
+          width_mm: Math.max(1, parseInt(frontWidth) || 1),
+          height_mm: Math.max(1, parseInt(frontHeight) || 1),
+          quantity: Math.max(1, parseInt(quantity) || 1),
+          back_fabric_type: screenType === 'double' ? fabName(backFabricType) : null,
+          back_width_mm: screenType === 'double' ? (parseInt(backWidth) || null) : null,
+          back_height_mm: screenType === 'double' ? (parseInt(backHeight) || null) : null,
+          process_top: proc.top, process_top_mm: pmm.top,
+          process_bottom: proc.bottom, process_bottom_mm: pmm.bottom,
+          process_left: proc.left, process_left_mm: pmm.left,
+          process_right: proc.right, process_right_mm: pmm.right,
+          velcro_type: velcroType,                       // 'male' | 'female'
+          skirt_attachment: hasSkirt ? skirtAttachment : null,
+          skirt_no_seam: hasSkirt ? !!skirtNoSeam : false,
+          eyelet_method: screenType !== 'skirtOnly' ? eyeletMethod : null,
+          fire_cert_no: isFireRetardant ? '防炎' : null,
+        };
+      };
+
+      // カートの全品目を1件の注文としてDBへ登録する。
+      const submitOrderToDB = async () => {
+        if (cart.length === 0) { alert('カートが空です。'); return; }
+        if (!custName.trim())   { alert('お名前を入力してください。'); return; }
+        if (!custPhone.trim())  { alert('電話番号を入力してください。'); return; }
+        if (!custPostal.trim()) { alert('郵便番号を入力してください。'); return; }
+        if (!custAddress.trim()){ alert('お届け先住所を入力してください。'); return; }
+        setSubmitting(true);
+        try {
+          const body = {
+            channel: 'self',
+            customer_name: custName.trim(),
+            phone: custPhone.trim(),
+            postal_code: custPostal.trim(),
+            address: custAddress.trim(),
+            payment_status: 'pending',
+            items: cart.map(i => i.spec).filter(Boolean),
+          };
+          const r = await fetch(API_BASE + '/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const d = await r.json();
+          if (!r.ok) {
+            alert('注文の登録に失敗しました:\n' + JSON.stringify(d.detail || d, null, 2));
+            setSubmitting(false);
+            return;
+          }
+          alert('ご注文を受け付けました。\n注文番号: ' + d.order_no +
+                '\n製品番号: ' + (d.barcodes || []).join(', '));
+          setCart([]); setSelectedCartItems([]);
+          setCustName(''); setCustPhone(''); setCustPostal(''); setCustAddress('');
+          setShowOrderModal(false); setShowCart(false);
+        } catch (e) {
+          alert('サーバー接続に失敗しました: ' + e);
+        }
+        setSubmitting(false);
+      };
+
       const addToCart = () => {
         if (!screenType) { alert('スクリーンタイプを選択してください。'); return; }
         const item = {
@@ -394,7 +479,10 @@
           sheetMultiplier: screenType === 'double' ? 2 : (screenType === 'skirtOnly' ? 0 : 1),
           unitPrice: totalPrice.subtotal,
           totalPrice: totalPrice.total,
-          discount: totalPrice.discount
+          discount: totalPrice.discount,
+          // --- バックエンド POST /api/orders (ItemIn) 用の変換済みスペック ---
+          // 表示用フィールドとは別に、DB登録に必要な機械可読の値をここに持たせる。
+          spec: buildItemSpec()
         };
         setCart([...cart, item]);
         alert('カートに追加しました！');
@@ -1576,11 +1664,17 @@
           {/* Order Modal */}
           {showOrderModal && (
             <div className="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg max-w-sm w-full p-8 shadow-xl text-center">
-                <h3 className="text-xl font-bold mb-2 text-gray-900">注文手続き</h3>
-                <p className="text-sm text-gray-500 mb-8">決済画面へ移動します。</p>
+              <div className="bg-white rounded-lg max-w-sm w-full p-8 shadow-xl">
+                <h3 className="text-xl font-bold mb-1 text-gray-900">注文手続き</h3>
+                <p className="text-sm text-gray-500 mb-6">お届け先を入力して注文を確定してください。</p>
+                <div className="space-y-3 mb-6">
+                  <input value={custName} onChange={e => setCustName(e.target.value)} type="text" placeholder="お名前" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <input value={custPhone} onChange={e => setCustPhone(e.target.value)} type="tel" placeholder="電話番号" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <input value={custPostal} onChange={e => setCustPostal(e.target.value)} type="text" placeholder="郵便番号 (例: 4910000)" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-cdi-main outline-none transition-colors" />
+                  <textarea value={custAddress} onChange={e => setCustAddress(e.target.value)} placeholder="お届け先住所" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg h-20 focus:bg-white focus:border-cdi-main outline-none transition-colors resize-none" />
+                </div>
                 <div className="flex flex-col gap-3">
-                  <button onClick={() => alert('決済画面へ移動します')} className="w-full bg-cdi-main text-white py-3 rounded-lg font-bold hover:bg-cdi-dark transition-colors shadow-sm">決済へ進む</button>
+                  <button disabled={submitting} onClick={submitOrderToDB} className="w-full bg-cdi-main text-white py-3 rounded-lg font-bold hover:bg-cdi-dark transition-colors shadow-sm disabled:opacity-60">{submitting ? '送信中...' : '注文を確定する'}</button>
                   <button onClick={() => setShowOrderModal(false)} className="w-full bg-white text-gray-500 py-3 rounded-lg font-medium hover:text-gray-800 transition-colors border border-gray-200">キャンセル</button>
                 </div>
               </div>
