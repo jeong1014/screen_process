@@ -101,6 +101,7 @@ const RESULT_HOLD_MS = 15000;  // 完了/開始画面を表示し続ける時間
 let lastShownAt = 0;
 let initialShown = false;  // ページを開いた直後の1回だけ「最終結果」を表示するためのフラグ
 let lastSig = null;        // 直近に大画面表示したスキャンの署名(バーコード@時刻)。重複表示を防ぐ。
+let printArmed = false;    // ページを開いた直後の“過去の完了”では印刷しないためのフラグ(2回目のloadから有効)。
 
 async function load(){
   try{
@@ -127,11 +128,18 @@ async function load(){
         lastSig = sig;
         showResult(d.last, (d.last.result || "") + " " + d.last.at);
         lastShownAt = Date.now();
+        // ★ ハトメ完了を検知したら送り状を印刷。どの端末でスキャンしても動くよう、
+        //    この画面のスキャン(doScan)だけでなくポーリング(load)でも判定する。
+        //    ページを開いた直後の“過去の完了”では印刷しない(printArmed で制御)。
+        if(printArmed && PROC === "eyelet" && d.last.result === "完了" && d.last.barcode){
+          printShippingSlip(d.last.barcode);
+        }
       }
     } else if(!initialShown){
       showIdle();
     }
     initialShown = true;
+    printArmed = true;
   }catch(e){}
 }
 function renderList(id, arr){
@@ -215,13 +223,8 @@ async function doScan(code){
   try{
     const d = await fetch("/api/monitor/"+PROC+"/scan",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({barcode:code})}).then(r=>r.json());
-    if(d.ok){
-      showResult(d, null);
-      // ハトメ工程で「完了」したら、その注文の送り状を自動で印刷する
-      if(PROC==='eyelet' && d.result==='完了' && d.barcode){
-        printShippingSlip(d.barcode);
-      }
-    } else showErr(d);
+    if(d.ok) showResult(d, null); else showErr(d);
+    // 送り状の印刷は load() のポーリング側で判定する(この画面以外でスキャンされた完了も拾うため)。
     lastShownAt = Date.now();
     load();
   }catch(e){ showErr({reason:"通信エラー"}); }
