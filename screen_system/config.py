@@ -1,0 +1,65 @@
+"""
+設定と定数 — 環境依存の値と、ロジックを持たない定数テーブルだけを置く。
+
+ここには関数・DB接続・FastAPI 依存を入れないこと。
+このモジュールは他のどのモジュールも import してよい最下層に位置する。
+"""
+
+import os
+
+# ===== 環境 =====
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://postgres:1234@localhost:5432/screen"
+)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+PRINTER_CONFIG_PATH = os.path.join(BASE_DIR, "printer_config.json")
+SCANNER_CONFIG_PATH = os.path.join(BASE_DIR, "scanner_config.json")
+SUMATRA_PATH = os.path.join(BASE_DIR, "SumatraPDF.exe")
+
+# 進行状態 stage の最大値 (0=受付 … 6=ハトメ完了)
+MAX_STAGE = 6
+
+
+# ===== 表示用ラベル =====
+SIDE_JA = {"top": "上", "bottom": "下", "left": "左", "right": "右"}
+PROC_BY_STAGE = {1: "裁断", 2: "裁断", 3: "ミシン", 4: "ミシン",
+                 5: "ハトメ", 6: "ハトメ"}
+
+# 販売サイトのオプション体系(2026-07 統合)に合わせた表示用ラベル
+VELCRO_JA = {"male": "オス", "female": "メス"}
+SKIRT_ATTACH_JA = {"sew": "縫い付け", "velcro": "マジックテープ"}
+EYELET_METHOD_JA = {"A": "方式A(コーナー基準)", "B": "方式B(間隔均等)", "C": "方式C(未定)"}
+# 2枚セット(two_sheet_set)の表面/裏面区分(裁断/ミシン/ハトメを2回スキャンするため2行に分けて管理)
+SHEET_SIDE_JA = {"front": "表面", "back": "裏面"}
+
+STAGE_NAME = {0: "受付", 1: "裁断中", 2: "裁断完了", 3: "ミシン中", 4: "ミシン完了",
+              5: "ハトメ中", 6: "ハトメ完了"}
+
+# 加工種別(DB) → ラベル v6 の processing 形式
+_PRODUCT_JP = {"single": "1枚", "two_sheet_set": "2枚セット", "skirt": "スカート"}
+
+
+# ===== 工程別モニター =====
+#   工程ごとの stage: queue(待機) → wip(作業中) → done(完了=次工程の待機)
+MON_PROC = {
+    "cutting": {"ja": "裁断",   "ko": "재단",   "queue": 0, "wip": 1, "done": 2},
+    "sewing":  {"ja": "ミシン", "ko": "미싱",   "queue": 2, "wip": 3, "done": 4},
+    "eyelet":  {"ja": "ハトメ", "ko": "하토메", "queue": 4, "wip": 5, "done": 6},
+}
+
+
+# ===== QR在庫 v2 =====
+#   品目はエクセル準拠のコード(11〜61)で管理。原反=ロール / 付属品=箱。
+INV_GROUPS = [(1, "原反"), (2, "マジックテープ"), (3, "ウェビング"),
+              (4, "アイレット"), (5, "糸"), (6, "カバー")]
+
+
+# ===== DB ビューア対象テーブル → 主キー列 =====
+DB_TABLES = {
+    "orders": "id", "order_items": "id", "scan_events": "id", "shipments": "id",
+    "print_jobs": "id", "sync_logs": "id", "fabric_inventory": "fabric_type",
+    "accessories": "id", "inventory_transactions": "id", "settings": "key",
+    "production_stages": "stage_no", "fire_safety_reports": "id", "fire_safety_report_items": "id",
+    "inv_item": "code", "inv_unit": "id", "inv_tx": "id",
+}

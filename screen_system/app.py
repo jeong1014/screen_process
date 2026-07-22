@@ -11,7 +11,6 @@ worker_v5.html / dashboard_v2_2.html の API契約に整合。
 DB  :  環境変数 DATABASE_URL
 """
 
-import code
 import os
 import json
 import subprocess
@@ -21,7 +20,6 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from datetime import date, datetime
-from typing import Optional, List
 
 import psycopg
 from psycopg.rows import dict_row
@@ -29,14 +27,21 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
 from print_templates import render_inventory_label, render_order_label, render_shipping_slip
 
-# ===== 設定 =====
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1234@localhost:5432/screen")
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
-MAX_STAGE = 6
+from config import (
+    DATABASE_URL, FRONTEND_DIR, MAX_STAGE,
+    SIDE_JA, PROC_BY_STAGE, VELCRO_JA, SKIRT_ATTACH_JA, EYELET_METHOD_JA,
+    SHEET_SIDE_JA, STAGE_NAME, _PRODUCT_JP, MON_PROC, INV_GROUPS, DB_TABLES,
+)
+from schemas import (
+    ItemIn, OrderIn, ScanIn, MonScan, InvScanIn, LoginIn,
+    AdjustIn, ReorderIn, AccIn,
+    InvIssueIn, InvAdjustIn, InvReorderIn, InvItemIn,
+    PurchaseReqIn, PurchaseOrderIn, PurchaseSettingsIn,
+    OrderPatch, StageFix, ShipIn, SettingsIn, DbEdit,
+)
 
 app = FastAPI(title="スクリーン原団 工程管理 v2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -49,16 +54,9 @@ def db():
 # =============================================================================
 # 表示用フォーマット (DBの構造データ → 各画面が期待する文字列)
 # =============================================================================
-SIDE_JA = {"top": "上", "bottom": "下", "left": "左", "right": "右"}
-PROC_BY_STAGE = {1: "裁断", 2: "裁断", 3: "ミシン", 4: "ミシン",
-                 5: "ハトメ", 6: "ハトメ"}
 
 # 販売サイトのオプション体系(2026-07 統合)に合わせた表示用ラベル
-VELCRO_JA = {"male": "オス", "female": "メス"}
-SKIRT_ATTACH_JA = {"sew": "縫い付け", "velcro": "マジックテープ"}
-EYELET_METHOD_JA = {"A": "方式A(コーナー基準)", "B": "方式B(間隔均等)", "C": "方式C(未定)"}
 # 2枚セット(two_sheet_set)の表面/裏面区分(裁断/ミシン/ハトメを2回スキャンするため2行に分けて管理)
-SHEET_SIDE_JA = {"front": "表面", "back": "裏面"}
 
 
 def fmt_opt(kind: str, mm) -> str:
@@ -195,46 +193,6 @@ def silent_print_html(html_content: str, printer_key: str):
 # =============================================================================
 # 入力モデル
 # =============================================================================
-class ItemIn(BaseModel):
-    product_type: str = "single"
-    fabric_type: str = "LN"
-    width_mm: int
-    height_mm: int
-    quantity: int = 1
-    # 2枚セット(two_sheet_set)用: 裏面の生地/サイズ(表面と別に指定可能)
-    back_fabric_type: Optional[str] = None
-    back_width_mm: Optional[int] = None
-    back_height_mm: Optional[int] = None
-    process_top: str = "none"
-    process_top_mm: Optional[int] = None
-    process_bottom: str = "none"
-    process_bottom_mm: Optional[int] = None
-    process_left: str = "none"
-    process_left_mm: Optional[int] = None
-    process_right: str = "none"
-    process_right_mm: Optional[int] = None
-    # 販売サイトのオプション体系に合わせた追加項目
-    velcro_type: str = "male"               # male / female (全製品に必ず付くため既定値あり)
-    skirt_attachment: Optional[str] = None  # sew / velcro
-    skirt_no_seam: bool = False
-    eyelet_method: Optional[str] = None     # A / B / C
-    fire_cert_no: Optional[str] = None
-
-
-class OrderIn(BaseModel):
-    channel: str
-    customer_name: str
-    postal_code: Optional[str] = None
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    payment_status: str = "paid"
-    mall_order_no: Optional[str] = None
-    ordered_at: Optional[str] = None
-    items: List[ItemIn] = Field(default_factory=list)
-
-
-class ScanIn(BaseModel):
-    order_no: str            # = barcode
 
 
 # =============================================================================
@@ -564,7 +522,6 @@ def page_label(barcode: str):
 
 
 # 加工種別(DB) → ラベル v6 の processing 形式
-_PRODUCT_JP = {"single": "1枚", "two_sheet_set": "2枚セット", "skirt": "スカート"}
 
 
 def _proc(kind, mm):
@@ -611,9 +568,6 @@ from fastapi import Header, Query
 from fastapi.responses import Response
 import csv, io
 
-STAGE_NAME = {0: "受付", 1: "裁断中", 2: "裁断完了", 3: "ミシン中", 4: "ミシン完了",
-              5: "ハトメ中", 6: "ハトメ完了"}
-
 
 def _get_setting(cur, key, default=None):
     cur.execute("SELECT value FROM settings WHERE key=%s", (key,))
@@ -644,10 +598,6 @@ def page_admin():
     return FileResponse(os.path.join(FRONTEND_DIR, "admin.html"))
 
 
-class LoginIn(BaseModel):
-    password: str
-
-
 @app.post("/api/admin/login")
 def admin_login(body: LoginIn):
     with db() as conn, conn.cursor() as cur:
@@ -671,15 +621,6 @@ def admin_inventory(_=Depends(require_admin)):
                 "cap": r["capacity"], "reorder": r["reorder_point"], "unit": r["unit"],
                 "low": r["remain"] <= r["reorder_point"]} for r in cur.fetchall()]
     return {"fabric": fabric, "accessories": acc}
-
-
-class AdjustIn(BaseModel):
-    kind: str                      # fabric / accessory
-    id: str                        # fabric_type(LN..) or accessory_id
-    delta: int                     # +入庫 / −消尽
-    reason: str = "adjust"         # in / out / adjust
-    note: Optional[str] = None
-    worker: Optional[str] = None
 
 
 @app.post("/api/admin/inventory/adjust")
@@ -709,12 +650,6 @@ def admin_inventory_adjust(body: AdjustIn, _=Depends(require_admin)):
             raise HTTPException(400, "kind は fabric / accessory")
         conn.commit()
     return {"ok": True, "balance": bal}
-
-
-class ReorderIn(BaseModel):
-    kind: str
-    id: str
-    reorder_point: int
 
 
 @app.post("/api/admin/inventory/reorder")
@@ -807,13 +742,6 @@ def admin_scans_csv(q: str = "", stage: str = "", date_from: str = "", date_to: 
                     headers={"Content-Disposition": 'attachment; filename="scan_history.csv"'})
 
 
-class AccIn(BaseModel):
-    name: str
-    unit: str = "箱"          # 付属品の単位は全て「箱」に統一
-    capacity: int = 10
-    reorder_point: int = 5
-
-
 @app.post("/api/admin/accessories")
 def admin_accessory_create(body: AccIn, _=Depends(require_admin)):
     with db() as conn, conn.cursor() as cur:
@@ -844,8 +772,6 @@ def admin_accessory_delete(acc_id: int, _=Depends(require_admin)):
 #       消尽済みQVを再スキャンしても二重差引はしない。
 #   テーブル: inv_item / inv_unit / inv_tx  (migrate_inventory_v2.py で作成)
 # --------------------------------------------------------------------------
-INV_GROUPS = [(1, "原反"), (2, "マジックテープ"), (3, "ウェビング"),
-              (4, "アイレット"), (5, "糸"), (6, "カバー")]
 
 
 @app.get("/invscan")
@@ -878,11 +804,6 @@ def api_inv_label(serial: str):
         raise HTTPException(404, f"見つかりません: {serial}")
     return {"serial": r2["code"], "code": r2["code"], "qrValue": r2["code"],
             "title": r2["name"], "sub": f'{r2["group_name"]} / {r2["code"]}', "unit": r2["unit"]}
-
-
-class InvScanIn(BaseModel):
-    code: str                      # = スキャンされたシリアル(例 11-00001)
-    worker: Optional[str] = None
 
 
 @app.post("/api/inventory/scan")
@@ -930,11 +851,6 @@ def admin_inv_list(_=Depends(require_admin)):
     return {"groups": [{"no": g[0], "name": g[1]} for g in INV_GROUPS], "items": items}
 
 
-class InvIssueIn(BaseModel):
-    count: int = 1
-    worker: Optional[str] = None
-
-
 @app.post("/api/admin/inv/{code}/issue")
 def admin_inv_issue(code: str, body: InvIssueIn, _=Depends(require_admin)):
     """QR発行 = 入庫(+count)。シリアル(コード-連番)を採番して返す。"""
@@ -964,12 +880,6 @@ def admin_inv_issue(code: str, body: InvIssueIn, _=Depends(require_admin)):
             "serials": serials, "balance": bal}
 
 
-class InvAdjustIn(BaseModel):
-    delta: int
-    note: Optional[str] = None
-    worker: Optional[str] = None
-
-
 @app.post("/api/admin/inv/{code}/adjust")
 def admin_inv_adjust(code: str, body: InvAdjustIn, _=Depends(require_admin)):
     """手動補正(棚卸差異など)。シリアルは発行しない。"""
@@ -985,10 +895,6 @@ def admin_inv_adjust(code: str, body: InvAdjustIn, _=Depends(require_admin)):
                     "VALUES (%s,%s,'adjust',%s,%s,%s)", (code, body.delta, r["remain"], body.note, body.worker))
         conn.commit()
     return {"ok": True, "balance": r["remain"]}
-
-
-class InvReorderIn(BaseModel):
-    reorder_point: int
 
 
 @app.post("/api/admin/inv/{code}/reorder")
@@ -1011,17 +917,6 @@ def admin_inv_history(limit: int = 300, _=Depends(require_admin)):
     return [{"t": r["created_at"].strftime("%Y-%m-%d %H:%M"), "code": r["code"], "name": r["name"],
              "serial": r["serial"], "delta": r["delta"], "reason": RJA.get(r["reason"], r["reason"]),
              "balance": r["balance_after"], "note": r["note"], "worker": r["worker"]} for r in rows]
-
-
-class InvItemIn(BaseModel):
-    code: str
-    category: str = "accessory"
-    group_no: int = 6
-    group_name: str = "その他"
-    name: str
-    unit: Optional[str] = None
-    fabric_type: Optional[str] = None
-    flame: Optional[bool] = None
 
 
 @app.post("/api/admin/inv/item")
@@ -1103,13 +998,6 @@ def _send_purchase_email(cfg, subject, body):
         return False, f"送信失敗: {str(e).splitlines()[0]}"
 
 
-class PurchaseReqIn(BaseModel):
-    code: str
-    qty: int
-    requested_by: Optional[str] = None
-    note: Optional[str] = None
-
-
 @app.post("/api/admin/purchase")
 def admin_purchase_create(body: PurchaseReqIn, _=Depends(require_admin)):
     """発注依頼を1件作成し、資材部へメール送信(設定済みの場合)。"""
@@ -1173,11 +1061,6 @@ def admin_purchase_list(status: str = "", limit: int = 300, _=Depends(require_ad
     return out
 
 
-class PurchaseOrderIn(BaseModel):
-    eta: str                       # 'YYYY-MM-DD'
-    order_note: Optional[str] = None
-
-
 @app.post("/api/admin/purchase/{po_id}/order")
 def admin_purchase_order(po_id: int, body: PurchaseOrderIn, _=Depends(require_admin)):
     """資材部: 発注済にして到着予定日を登録(依頼中/発注済のどちらからでも更新可)。"""
@@ -1228,19 +1111,6 @@ def admin_purchase_settings_get(_=Depends(require_admin)):
         cfg = _smtp_config(cur)
     cfg["pass_set"] = bool(cfg.pop("pass"))   # パスワードは返さず設定有無だけ
     return cfg
-
-
-class PurchaseSettingsIn(BaseModel):
-    to: str = ""
-    host: str = ""
-    port: str = "587"
-    user: str = ""
-    password: Optional[str] = None   # 空文字=変更なし
-    from_: str = Field("", alias="from")
-    tls: str = "starttls"
-
-    class Config:
-        populate_by_name = True
 
 
 @app.post("/api/admin/purchase/settings")
@@ -1342,15 +1212,6 @@ def admin_order_detail(order_no: str, _=Depends(require_admin)):
     }
 
 
-class OrderPatch(BaseModel):
-    order_no: Optional[str] = None          # 新しい注文番号(変更時)
-    customer_name: Optional[str] = None
-    postal_code: Optional[str] = None
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    payment_status: Optional[str] = None
-
-
 @app.patch("/api/admin/orders/{order_no}")
 def admin_order_edit(order_no: str, body: OrderPatch, _=Depends(require_admin)):
     data = body.model_dump()
@@ -1390,10 +1251,6 @@ def admin_order_cancel(order_no: str, _=Depends(require_admin)):
     return {"ok": True}
 
 
-class StageFix(BaseModel):
-    stage: int
-
-
 @app.patch("/api/admin/items/{barcode}/stage")
 def admin_item_stage(barcode: str, body: StageFix, _=Depends(require_admin)):
     st = max(0, min(MAX_STAGE, body.stage))
@@ -1420,14 +1277,6 @@ def admin_shipments(_=Depends(require_admin)):
     return [{"order_no": r["order_no"], "customer_name": r["customer_name"], "shipment_no": r["shipment_no"],
              "tracking_no": r["tracking_no"], "shipping_status": r["shipping_status"],
              "bizlogi_status": r["bizlogi_status"], "package_count": r["package_count"]} for r in rows]
-
-
-class ShipIn(BaseModel):
-    order_no: str
-    tracking_no: Optional[str] = None
-    shipping_status: Optional[str] = None
-    bizlogi_status: Optional[str] = None
-    package_count: Optional[int] = None
 
 
 @app.post("/api/admin/shipments")
@@ -1595,10 +1444,6 @@ def admin_settings_get(_=Depends(require_admin)):
     return rows
 
 
-class SettingsIn(BaseModel):
-    values: dict
-
-
 @app.post("/api/admin/settings")
 def admin_settings_set(body: SettingsIn, _=Depends(require_admin)):
     with db() as conn, conn.cursor() as cur:
@@ -1613,14 +1458,6 @@ def admin_settings_set(body: SettingsIn, _=Depends(require_admin)):
 # DB ビューア (管理者) — 任意テーブルを閲覧 + セル編集
 # =============================================================================
 from psycopg import sql as _sql
-
-DB_TABLES = {
-    "orders": "id", "order_items": "id", "scan_events": "id", "shipments": "id",
-    "print_jobs": "id", "sync_logs": "id", "fabric_inventory": "fabric_type",
-    "accessories": "id", "inventory_transactions": "id", "settings": "key",
-    "production_stages": "stage_no", "fire_safety_reports": "id", "fire_safety_report_items": "id",
-    "inv_item": "code", "inv_unit": "id", "inv_tx": "id",
-}
 
 
 def _col_types(cur, table):
@@ -1648,11 +1485,6 @@ def db_view(table: str, limit: int = 300, _=Depends(require_admin)):
         cur.execute(_sql.SQL("SELECT * FROM {} ORDER BY 1 DESC LIMIT %s").format(_sql.Identifier(table)), (limit,))
         rows = cur.fetchall()
     return {"table": table, "pk": DB_TABLES[table], "columns": columns, "rows": rows}
-
-
-class DbEdit(BaseModel):
-    pk_value: str
-    changes: dict
 
 
 @app.patch("/api/admin/db/{table}")
@@ -1690,11 +1522,6 @@ def db_edit(table: str, body: DbEdit, _=Depends(require_admin)):
 #   スキャン=進行(その工程の対象のみ)。モニターは待機/作業中/実績を表示。
 #   工程ごとの stage: queue(待機) → wip(作業中) → done(完了=次工程の待機)
 # =============================================================================
-MON_PROC = {
-    "cutting": {"ja": "裁断",   "ko": "재단",   "queue": 0, "wip": 1, "done": 2},
-    "sewing":  {"ja": "ミシン", "ko": "미싱",   "queue": 2, "wip": 3, "done": 4},
-    "eyelet":  {"ja": "ハトメ", "ko": "하토메", "queue": 4, "wip": 5, "done": 6},
-}
 
 
 def stage_to_proc(stage: int):
@@ -1783,10 +1610,6 @@ def api_monitor(proc: str):
             "queue": queue, "wip": wip, "queue_count": len(queue), "wip_count": len(wip),
             "today_done": today_done, "last": last,
             "server_time": datetime.now().strftime("%H:%M:%S")}
-
-
-class MonScan(BaseModel):
-    barcode: str
 
 
 @app.post("/api/monitor/{proc}/scan")
