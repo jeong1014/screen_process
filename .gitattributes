@@ -1,0 +1,12 @@
+# 줄바꿈 정규화 — 저장소에는 항상 LF, 작업 폴더는 OS 기본값.
+# 이 설정이 없으면 Windows 노트북과 라즈베리파이에서 같은 파일이 서로
+# "수정됨"으로 보여 pull 이 막힌다.
+* text=auto
+
+# 바이너리 (건드리지 말 것)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.xlsx binary
+*.exe binary
