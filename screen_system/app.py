@@ -21,15 +21,20 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from print_templates import render_inventory_label, render_order_label, render_shipping_slip
+from print_templates import render_inventory_label, render_order_label
 from db import db, _set_setting
 from security import require_admin, _check_pw_query, _admin_password
 from services.printing import silent_print_html
 from services.mailer import _smtp_config, _send_purchase_email
 from services.formatting import (
     fmt_opt, size_str, qty_str, item_sides, worker_payload,
-    board_status, _proc, stage_to_proc, _proc_fields, _eyelet_diagram_info,
+    board_status, _proc, _proc_fields, _eyelet_diagram_info,
 )
+from services.stage import (
+    next_order_no, _fetch_item, get_item_payload, move_stage, monitor_scan,
+)
+from services.inventory import inv_scan
+from services.shipping import fetch_order_by_id, auto_print_shipping_slip
 
 from config import (
     FRONTEND_DIR, MAX_STAGE, PROC_BY_STAGE, SHEET_SIDE_JA,
@@ -117,10 +122,6 @@ def api_shipping_slip(barcode: str):
 # =============================================================================
 # 入力: 注文全体(顧客+明細)  POST /api/orders
 # =============================================================================
-def next_order_no(cur) -> str:
-    ymd = date.today().strftime("%y%m%d")   # 例: 260713
-    cur.execute("SELECT count(*) AS c FROM orders WHERE order_no LIKE %s", (f"CDI{ymd}%",))
-    return f"CDI{ymd}{cur.fetchone()['c']+1:03d}"   # CDI260713001
 
 
 @app.post("/api/orders")
@@ -212,84 +213,22 @@ def create_order(order: OrderIn):
 # =============================================================================
 # 作業者画面
 # =============================================================================
-def _fetch_item(cur, barcode):
-    cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
-    return cur.fetchone()
-
-
-def _pair_barcode(cur, row):
-    """2枚セット(表面/裏面)で、対になるもう片方のバーコードを引く。単品なら None。"""
-    if not row or not row.get("pair_item_no"):
-        return None
-    cur.execute("SELECT barcode FROM order_items WHERE order_id=%s AND item_no=%s",
-                (row["order_id"], row["pair_item_no"]))
-    r = cur.fetchone()
-    return r["barcode"] if r else None
 
 
 @app.get("/api/orders/{order_no}")
 def get_order(order_no: str):
     """作業者画面: バーコードで製品情報+stage を取得。"""
-    with db() as conn, conn.cursor() as cur:
-        row = _fetch_item(cur, order_no)
-        if not row:
-            raise HTTPException(404, f"製品番号が見つかりません: {order_no}")
-        pair_bc = _pair_barcode(cur, row)
-    return worker_payload(row, pair_bc)
-
-
-def _move(order_no: str, delta: int):
-    with db() as conn, conn.cursor() as cur:
-        row = _fetch_item(cur, order_no)
-        if not row:
-            raise HTTPException(404, f"製品番号が見つかりません: {order_no}")
-        new_stage = min(MAX_STAGE, max(0, row["current_stage"] + delta))
-        et = "undo" if delta < 0 else ("complete" if new_stage % 2 == 0 else "start")
-        cur.execute(
-            """UPDATE order_items
-               SET current_stage=%s,
-                   started_at = COALESCE(started_at, CASE WHEN %s>0 THEN now() END),
-                   completed_at = CASE WHEN %s=%s THEN now() ELSE completed_at END
-               WHERE id=%s""",
-            (new_stage, delta, new_stage, MAX_STAGE, row["id"]),
-        )
-        cur.execute(
-            "INSERT INTO scan_events (order_item_id, stage_no, event_type, station) VALUES (%s,%s,%s,%s)",
-            (row["id"], new_stage, et, "worker_screen"),
-        )
-        cur.execute("SELECT * FROM order_items WHERE id=%s", (row["id"],))
-        row = cur.fetchone()
-        pair_bc = _pair_barcode(cur, row)
-        conn.commit()
-    ###################
-        if new_stage == MAX_STAGE and delta > 0:
-            print(f"📦 제품 {order_no} ハトメ完了(최종) -> 송장 자동 출력 개시")
-            
-            # 1. 주문(고객) 정보 가져오기 (이 부분이 추가되었습니다!)
-            cur.execute("SELECT * FROM orders WHERE order_no=%s", (order_no,))
-            order_info = cur.fetchone() or {}
-            
-            # 2. 해당 주문에 포함된 전체 제품 목록 가져오기
-            cur.execute("SELECT barcode, fabric_type as fabric, width_mm, height_mm FROM order_items WHERE order_id=%s", (row["order_id"],))
-            items_db = cur.fetchall()
-            items_list = [{"barcode": i["barcode"], "fabric": i["fabric"], "size": f"W{i['width_mm']}xH{i['height_mm']}"} for i in items_db]
-            
-            # 3. 위에서 만든 템플릿에 데이터(order_info)를 넣어 HTML 생성
-            html_content = render_shipping_slip(order_no=order_no, order_info=order_info, items=items_list)
-            
-            # 4. 송장 프린터로 전송
-            silent_print_html(html_content, "invoice_printer")
-    return worker_payload(row, pair_bc)
+    return get_item_payload(order_no)
 
 
 @app.post("/api/scan")
 def scan(s: ScanIn):
-    return _move(s.order_no, +1)
+    return move_stage(s.order_no, +1)
 
 
 @app.post("/api/scan/undo")
 def scan_undo(s: ScanIn):
-    return _move(s.order_no, -1)
+    return move_stage(s.order_no, -1)
 
 
 # =============================================================================
@@ -388,8 +327,6 @@ def page_label_multi():
 def page_label(barcode: str):
     return FileResponse(os.path.join(FRONTEND_DIR, "label_gorilla.html"))
 
-
-# 加工種別(DB) → ラベル v6 の processing 形式
 
 
 @app.get("/api/label/{barcode}")
@@ -645,33 +582,7 @@ def api_inv_label(serial: str):
 @app.post("/api/inventory/scan")
 def api_inv_scan(body: InvScanIn):
     """QRシリアルをスキャン → 在庫-1・個体を消尽に。二重差引はしない。"""
-    serial = (body.code or "").strip().upper()
-    if not serial:
-        return {"ok": False, "reason": "空のQR", "serial": serial}
-    with db() as conn, conn.cursor() as cur:
-        cur.execute("""WITH upd AS (
-                          UPDATE inv_unit SET status='consumed', consumed_at=now(), worker=%s
-                          WHERE serial=%s AND status='in_stock' RETURNING code
-                        ), dec AS (
-                          UPDATE inv_item SET remain = GREATEST(0, remain - 1)
-                          WHERE code = (SELECT code FROM upd)
-                          RETURNING code, remain, name, unit, reorder_point
-                        )
-                        SELECT code, remain, name, unit, reorder_point FROM dec""",
-                    (body.worker, serial))
-        row = cur.fetchone()
-        if row:
-            cur.execute("INSERT INTO inv_tx (code, serial, delta, reason, balance_after, worker) "
-                        "VALUES (%s,%s,-1,'consume',%s,%s)", (row["code"], serial, row["remain"], body.worker))
-            conn.commit()
-            return {"ok": True, "serial": serial, "name": row["name"], "unit": row["unit"],
-                    "balance": row["remain"], "low": row["remain"] <= row["reorder_point"]}
-        cur.execute("SELECT status FROM inv_unit WHERE serial=%s", (serial,))
-        u = cur.fetchone()
-        conn.rollback()
-    if u and u["status"] == "consumed":
-        return {"ok": False, "reason": "既に消尽済みのQR(二重差引なし)", "serial": serial}
-    return {"ok": False, "reason": "未登録のQR", "serial": serial}
+    return inv_scan(body.code, body.worker)
 
 
 # ---- 管理: 品目一覧 / QR発行(入庫) / 調整 / 発注点 / 履歴 / 品目CRUD ----
@@ -1363,42 +1274,7 @@ def api_monitor(proc: str):
 
 @app.post("/api/monitor/{proc}/scan")
 def api_monitor_scan(proc: str, body: MonScan):
-    if proc not in MON_PROC:
-        raise HTTPException(404, "不明な工程")
-    bc = body.barcode.strip()
-    with db() as conn, conn.cursor() as cur:
-        cur.execute("""SELECT oi.*, o.order_status FROM order_items oi JOIN orders o ON o.id=oi.order_id
-                       WHERE oi.barcode=%s""", (bc,))
-        it = cur.fetchone()
-        if not it:
-            return {"ok": False, "reason": "未登録バーコード", "barcode": bc}
-        if it["order_status"] == "cancelled":
-            return {"ok": False, "reason": "キャンセル済みの注文", "barcode": bc}
-        cur_stage = it["current_stage"]
-        # URLのproc(=どのモニター画面がスキャンを受けたか)ではなく、実際のstageから
-        # 工程を自動判定する。これで複数モニターを1台のPCで開いていて、スキャン時に
-        # 別の画面がフォーカスされていても正しい工程として処理される。
-        actual_proc, info = stage_to_proc(cur_stage)
-        if not info:
-            return {"ok": False, "reason": f"対象外(現在: {STAGE_NAME.get(cur_stage, cur_stage)})",
-                    "barcode": bc, "fabric": it["fabric_type"],
-                    "size": size_str(it["width_mm"], it["height_mm"]),
-                    "fields": _proc_fields(proc, it)}
-        if cur_stage == info["queue"]:
-            new, result, et = info["wip"], "開始", "start"
-        else:  # cur_stage == info["wip"]
-            new, result, et = info["done"], "完了", "complete"
-        cur.execute("""UPDATE order_items SET current_stage=%s,
-                         started_at=COALESCE(started_at, now()) WHERE id=%s""", (new, it["id"]))
-        cur.execute("INSERT INTO scan_events (order_item_id, stage_no, event_type, station) VALUES (%s,%s,%s,%s)",
-                    (it["id"], new, et, "monitor_" + actual_proc))
-        conn.commit()
-    out = {"ok": True, "result": result, "barcode": bc, "fabric": it["fabric_type"],
-           "size": size_str(it["width_mm"], it["height_mm"]), "stage_name": STAGE_NAME.get(new, ""),
-           "fields": _proc_fields(actual_proc, it)}
-    if actual_proc == "eyelet":
-        out.update(_eyelet_diagram_info(it))
-    return out
+    return monitor_scan(proc, body.barcode)
     
 # =============================================================================
 # [통합] 내장 시리얼 바코드 스캐너 백그라운드 스레드 제어 (JSON 설정 기반)
@@ -1446,42 +1322,28 @@ def _serial_reader_worker(config):
                             try:
                                 # 🌟 1. 재고 바코드인지 먼저 검사 (형식: 숫자2~4자리 - 숫자3~6자리)
                                 if re.match(r"^\d{2,4}-\d{3,6}$", barcode_data):
-                                    body = InvScanIn(code=barcode_data)
-                                    result = api_inv_scan(body)  # 재고 차감 함수 직접 호출
+                                    result = inv_scan(barcode_data)  # 재고 차감 서비스 직접 호출
                                     print(f"📦 [{port}] 재고 스캔 처리 완료: {result}")
                                     continue  # 재고 처리를 완료했으므로 아래의 공정 진행 로직은 건너뜀 (중요)
                                 
                                 # 🌟 2. 일반 생산/공정 바코드인 경우 기존 로직 수행
                                 if scan_type == "monitor":
-                                    body = MonScan(barcode=barcode_data)
-                                    result = api_monitor_scan(proc, body)
+                                    result = monitor_scan(proc, barcode_data)
                                     print(f"✅ [{port}] 모니터 스캔 처리 완료: {result}")
                                     if result.get("ok") and result.get("stage_name") == "ハトメ完了":
                                         print(f"📦 [{port}] 제품 {barcode_data} 최종 공정 완료 -> 송장 자동 출력 개시")
                                         
                                         with db() as conn, conn.cursor() as cur:
-                                            # 1. order_items에서는 order_id만 조회합니다. (order_no는 이 테이블에 없음)
+                                            # order_items 에는 order_no 가 없으므로 order_id 로 주문을 역추적한다.
                                             cur.execute("SELECT order_id FROM order_items WHERE barcode=%s", (barcode_data,))
                                             item_info = cur.fetchone()
-                                            
                                             if item_info:
                                                 order_id = item_info["order_id"]
-                                                
-                                                # 2. orders 테이블에서 고유 id로 전체 주문 정보와 order_no를 가져옵니다.
-                                                cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
-                                                order_info = cur.fetchone() or {}
+                                                order_info = fetch_order_by_id(cur, order_id)
                                                 order_no = order_info.get("order_no", "UNKNOWN")
-                                                
-                                                # 3. 해당 주문의 전체 제품 목록 가져오기
-                                                cur.execute("SELECT barcode, fabric_type as fabric, width_mm, height_mm FROM order_items WHERE order_id=%s", (order_id,))
-                                                items_db = cur.fetchall()
-                                                items_list = [{"barcode": i["barcode"], "fabric": i["fabric"], "size": f"W{i['width_mm']}xH{i['height_mm']}"} for i in items_db]
-                                                
-                                                # 4. HTML 생성 및 출력
-                                                html_content = render_shipping_slip(order_no=order_no, order_info=order_info, items=items_list)
-                                                silent_print_html(html_content, "invoice_printer")
+                                                auto_print_shipping_slip(cur, order_no, order_id, order_info)
                                 elif scan_type == "worker":
-                                    result = _move(barcode_data, +1)
+                                    result = move_stage(barcode_data, +1)
                                     print(f"✅ [{port}] 작업자 스캔 처리 완료: {result['order_no']} (Stage: {result['stage']})")
                                     
                             except HTTPException as he:
