@@ -1,4 +1,11 @@
-# app.py 모듈 분리 계획
+# app.py 모듈 분리 계획 — ✅ 완료 (브랜치 `refactor/split-app`)
+
+> **실기 검증이 남아 있습니다.** 아래 6번 항목의 스모크 테스트를 공장 환경에서
+> 한 번 돌린 뒤 `main` 에 머지하세요. 특히 **스캔 진행 / UNDO / 송장 자동 출력**.
+>
+> 실행: `uvicorn main:app --host 0.0.0.0 --port 8000` (기존 `app:app` 도 동작)
+> 회귀 검사: `python check_api.py verify main`
+
 
 - 대상: `screen_system/app.py` (1938줄, 라우트 약 70개)
 - 범위: 백엔드만. 프론트엔드(`frontend/*.html`)는 이번에 손대지 않음
