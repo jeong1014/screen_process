@@ -101,7 +101,7 @@ def render_order_label(item_data: dict):
     eyelet_dots = "".join(["<i></i>" for _ in range(7)])
 
     # =========================================================================
-    # PSD(ゴリラインパクト) デザイン準拠。ラベル紙 110mm x 449.2mm。
+    # PSD(ゴリラインパクト) デザイン準拠。ラベル紙 110mm x 410mm(226mmで二つ折り)。
     # WeasyPrint(silent_print_html) で PDF 化されるため、絶対配置ベース。
     # 各要素の top(mm) は PSD 実測座標(1102x4500px / 10.018px per mm)から算出。
     # =========================================================================
@@ -111,24 +111,24 @@ def render_order_label(item_data: dict):
     <head>
     <meta charset="UTF-8">
     <style>
-      @page {{ size: 110mm 449.2mm; margin: 0; }}
+      @page {{ size: 110mm 410mm; margin: 0; }}
       html, body {{ margin: 0; padding: 0; background: #fff; }}
       * {{ box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }}
-      .label {{ position: relative; width: 110mm; height: 449.2mm; margin: 0; background: #fff; color: #000;
+      .label {{ position: relative; width: 110mm; height: 410mm; margin: 0; background: #fff; color: #000;
         font-family: Arial, Helvetica, "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; overflow: hidden; }}
       .label > * {{ position: absolute; }}
 
       /* 二つ折り: 224.6mm で折り、下半分(=裏面)を180°回転して印刷する */
-      .backside {{ position: absolute; left: 0; top: 224.6mm; width: 110mm; height: 224.6mm; transform: rotate(180deg); }}
+      .backside {{ position: absolute; left: 0; top: 226mm; width: 110mm; height: 184mm; transform: rotate(180deg); }}
       .backside > * {{ position: absolute; }}
-      .foldmark {{ top: 224.6mm; width: 5mm; height: 0; border-top: 0.3mm solid #000; }}
+      .foldmark {{ top: 226mm; width: 5mm; height: 0; border-top: 0.3mm solid #000; }}
       .foldmark.l {{ left: 0; }}
       .foldmark.r {{ right: 0; }}
 
       .perf {{ display: flex; justify-content: space-between; align-items: center; }}
       .perf i {{ width: 3.4mm; height: 3.4mm; border-radius: 50%; background: #000; display: block; }}
       .perf.top {{ left: 0.6mm; right: 0.6mm; top: 27.9mm; }}
-      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 441.0mm; }}
+      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 404.5mm; }}
 
       .head {{ left: 8.8mm; top: 44.5mm; }}
       .head .code {{ font-family: Arial, Helvetica, sans-serif; font-weight: 800; font-size: 27.5mm; line-height: 1;
@@ -148,23 +148,23 @@ def render_order_label(item_data: dict):
       .imgwrap {{ left: 0; right: 0; text-align: center; }}
       .gorilla-w {{ top: 155.6mm; }}
       .gorilla-w img {{ width: 108.4mm; height: auto; display: inline-block; }}
-      .wash-w {{ top: 73.1mm; }}
+      .wash-w {{ top: 22.5mm; }}
       .wash-w img {{ width: 103.5mm; height: auto; display: inline-block; }}
 
-      .qr-w {{ left: 0; right: 0; top: 112.2mm; text-align: center; }}
+      .qr-w {{ left: 0; right: 0; top: 61.6mm; text-align: center; }}
       .qrbox {{ display: inline-block; position: relative; width: 58.2mm; height: 58.2mm; }}
       .qrbox img.qr-img {{ width: 58.2mm; height: 58.2mm; display: block; image-rendering: pixelated; }}
       .qrbox .logo {{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 11mm; height: 11mm; background: #fff; display: flex; align-items: center; justify-content: center; }}
       .qrbox .logo img {{ width: 9mm; height: auto; display: block; }}
 
-      .foot {{ left: 0; right: 0; top: 179.4mm; text-align: center; }}
+      .foot {{ left: 0; right: 0; top: 128.8mm; text-align: center; }}
       .foot .company {{ font-size: 3.4mm; font-weight: 600; line-height: 4.5mm; }}
       .foot .addr {{ font-size: 3.4mm; font-weight: 500; line-height: 4.5mm; }}
-      .design {{ left: 0; right: 0; top: 198.6mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
-      .cdilogo-w {{ top: 207.7mm; }}
+      .design {{ left: 0; right: 0; top: 148.0mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
+      .cdilogo-w {{ top: 157.1mm; }}
       .cdilogo-w img {{ width: 94.5mm; height: auto; display: inline-block; }}
 
-      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 429.0mm; display: flex; justify-content: space-between; }}
+      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 392.5mm; display: flex; justify-content: space-between; }}
       .eyelets i {{ width: 7mm; height: 7mm; border-radius: 50%; border: 0.9mm solid #000; position: relative; display: block; }}
       .eyelets i::after {{ content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 3.2mm; height: 3.2mm; border-radius: 50%; border: 0.7mm solid #000; }}
 

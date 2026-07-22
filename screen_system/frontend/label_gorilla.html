@@ -7,7 +7,7 @@
   <title>スクリーン生地ラベル (ゴリラインパクト)</title>
   <style>
     @page {
-      size: 110mm 449.2mm;
+      size: 110mm 410mm;
       margin: 0;
     }
 
@@ -27,7 +27,7 @@
     .label {
       position: relative;
       width: 110mm;
-      height: 449.2mm;
+      height: 410mm;
       margin: 0 auto;
       background: #fff;
       color: #000;
@@ -40,15 +40,16 @@
     }
 
     /* ===== 二つ折り =====
-       全長 449.2mm を 224.6mm で半分に折る。
+       全長 410mm を 226mm で折る。折り目の前後に約10mmずつ余白。
        上半分 = 表面 / 下半分 = 裏面。折って裏返すと下半分は上下逆さまに見えるため、
-       下半分をまとめて 180° 回転させて印刷する(=折った状態で正しく読める)。 */
+       下半分をまとめて 180° 回転させて印刷する(=折った状態で正しく読める)。
+       裏面は表面より短い(184mm)。用紙を短くするため意図的にそうしている。 */
     .backside {
       position: absolute;
       left: 0;
-      top: 224.6mm;
+      top: 226mm;
       width: 110mm;
-      height: 224.6mm;
+      height: 184mm;
       transform: rotate(180deg);
     }
 
@@ -58,7 +59,7 @@
 
     /* 折り位置の目印(端の短い線だけ。中央は印字しない) */
     .foldmark {
-      top: 224.6mm;
+      top: 226mm;
       width: 5mm;
       height: 0;
       border-top: 0.3mm solid #000;
@@ -72,7 +73,7 @@
       .foldguide {
         left: 0;
         right: 0;
-        top: 224.6mm;
+        top: 226mm;
         height: 0;
         border-top: 0.2mm dashed #9bb;
       }
@@ -124,7 +125,7 @@
     }
 
     .perf.bottom {
-      top: 441.0mm;
+      top: 404.5mm;
     }
 
     /* header LN + product name */
@@ -221,7 +222,7 @@
     .washcare {
       left: 50%;
       transform: translateX(-50%);
-      top: 73.1mm;
+      top: 22.5mm;
       width: 103.5mm;
       height: auto;
       display: block;
@@ -231,7 +232,7 @@
     .qrbox {
       left: 50%;
       transform: translateX(-50%);
-      top: 112.2mm;
+      top: 61.6mm;
       width: 58.2mm;
       height: 58.2mm;
     }
@@ -266,7 +267,7 @@
     .foot {
       left: 0;
       right: 0;
-      top: 179.4mm;
+      top: 128.8mm;
       text-align: center;
     }
 
@@ -286,7 +287,7 @@
     .design {
       left: 0;
       right: 0;
-      top: 198.6mm;
+      top: 148.0mm;
       text-align: center;
       font-size: 3.1mm;
       font-weight: 500;
@@ -297,7 +298,7 @@
     .cdilogo {
       left: 50%;
       transform: translateX(-50%);
-      top: 207.7mm;
+      top: 157.1mm;
       width: 94.5mm;
       height: auto;
       display: block;
@@ -307,7 +308,7 @@
     .eyelets {
       left: 0.2mm;
       right: 0.2mm;
-      top: 429.0mm;
+      top: 392.5mm;
       display: flex;
       justify-content: space-between;
     }
