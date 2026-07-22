@@ -467,7 +467,7 @@ async function loadPoReq(){
   try{
     const d=await api("/api/admin/inv");
     const rowHtml=it=>`<tr>
-        <td style="white-space:nowrap"><span class="fb ${it.fabric_type||'ACC'}">${esc(it.code)}</span> ${esc(it.name)}</td>
+        <td style="white-space:nowrap"><span class="fb ${it.fabric_type||(it.category==='supply'?'SUP':'ACC')}">${esc(it.code)}</span> ${esc(it.name)}</td>
         <td class="muted">在庫 <b style="color:${it.low?'var(--danger)':'var(--text)'}">${it.remain}</b>/${it.cap} ${esc(it.unit)} ${it.low?'<span class="low-txt">要発注</span>':''}</td>
         <td><input type="number" min="1" value="${Math.max(1,it.reorder||1)}" id="poq_${it.code}" style="width:72px"> ${esc(it.unit)}</td>
         <td><button class="b b-pri" onclick="sendPoReq('${it.code}')">依頼</button></td></tr>`;
