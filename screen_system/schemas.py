@@ -32,6 +32,9 @@ class ItemIn(BaseModel):
     process_right: str = "none"
     process_right_mm: Optional[int] = None
     # 販売サイトのオプション体系に合わせた追加項目
+    # ベルクロ・ハトメ・スカートは同じ辺に同時に付くため、process_* とは別に持つ。
+    velcro_sides: Optional[int] = None      # ベルクロ面数: None=なし / 3=上左右 / 4=四辺
+    has_skirt: bool = False                 # スカート有無(下辺のみ)
     velcro_type: str = "male"               # male / female (全製品に必ず付くため既定値あり)
     skirt_attachment: Optional[str] = None  # sew / velcro
     skirt_no_seam: bool = False

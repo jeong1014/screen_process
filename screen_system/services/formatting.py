@@ -5,8 +5,19 @@
 """
 
 from config import (
-    SIDE_JA, VELCRO_JA, SKIRT_ATTACH_JA, EYELET_METHOD_JA, SHEET_SIDE_JA, MON_PROC,
+    VELCRO_JA, SKIRT_ATTACH_JA, EYELET_METHOD_JA, SHEET_SIDE_JA, MON_PROC,
 )
+
+# ベルクロ面数 → 実際に付く辺。3面はスカートの付く下辺を除いた 上・左・右。
+VELCRO_SIDE_NAMES = {3: ["上", "左", "右"], 4: ["上", "下", "左", "右"]}
+
+
+def velcro_label(sides) -> str:
+    """ベルクロ面数 → 「有り(上・左・右)」形式。未設定は「無し」。"""
+    if not sides:
+        return "無し"
+    names = VELCRO_SIDE_NAMES.get(sides)
+    return "有り(" + "・".join(names) + ")" if names else "有り"
 
 
 def fmt_opt(kind: str, mm) -> str:
@@ -54,8 +65,8 @@ def worker_payload(row, pair_barcode=None):
        2枚セット(two_sheet_set)は表面/裏面が別行(別バーコード)なので、
        この行がどちら側か(sheet_side)と、対になるもう片方のバーコード(pair_barcode)を含める。"""
     s = item_sides(row)
-    velcro_sides = [SIDE_JA[k] for k, (kind, _) in s.items() if kind == "velcro"]
-    skirt_any = any(kind == "skirt" for kind, _ in s.values())
+    # ベルクロ/スカートは辺ごとの加工(=ハトメ)とは別列で持つ。同じ辺に同時に付くため。
+    skirt_any = bool(row.get("has_skirt"))
     eyelet_pitch_mm = next((mm for kind, mm in s.values() if kind == "eyelet" and mm), None)
     return {
         "order_no": row["barcode"],
@@ -63,9 +74,9 @@ def worker_payload(row, pair_barcode=None):
         "size": size_str(row["width_mm"], row["height_mm"]),
         "sheet_side": SHEET_SIDE_JA.get(row.get("sheet_side")),
         "pair_barcode": pair_barcode,
-        # ベルクロは全製品に必ず付くため(辺ごとの選択は廃止)、常に「有り」+ 雌雄を表示。
-        # 旧データで辺に'velcro'が個別設定されていれば、その面も参考として表示する。
-        "magictape": "有り" + ("(" + "・".join(velcro_sides) + ")" if velcro_sides else ""),
+        # ベルクロは面数(3面=上左右 / 4面)で管理する。なしの注文もある。
+        "magictape": velcro_label(row.get("velcro_sides")),
+        "velcro_sides": row.get("velcro_sides"),
         "velcro_type": VELCRO_JA.get(row.get("velcro_type"), "-"),
         "skirt": "有り" if skirt_any else "無し",
         "skirt_attachment": SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "なし") if skirt_any else "なし",
@@ -92,11 +103,15 @@ def board_status(stage: int):
     }
 
 
-def _proc(kind, mm):
+def _proc(kind, mm, skirt=False):
+    """ラベル用: 1辺の加工表現。ハトメとスカートは同じ辺に同時に付くので
+       ハトメを主表示にし、スカートは skirt フラグで併記させる。"""
     if kind == "eyelet":
-        return {"type": "eyelet", "spacing": mm}
-    if kind in ("skirt", "velcro"):
-        return {"type": kind}
+        return {"type": "eyelet", "spacing": mm, "skirt": skirt}
+    if skirt:
+        return {"type": "skirt"}
+    if kind == "velcro":            # 旧データ互換
+        return {"type": "velcro"}
     return {"type": "none"}
 
 
@@ -116,14 +131,13 @@ def _proc_fields(proc, row):
     """モニター画面(cutting/sewing/eyelet)に必要な情報を [ラベル, 値] で返す。
        作業者画面(worker_payload)の内容と揃えてある。"""
     s = item_sides(row)
-    skirt_any = any(kind == "skirt" for kind, _ in s.values())
+    skirt_any = bool(row.get("has_skirt"))
     if proc == "cutting":
         return [["サイズ", size_str(row["width_mm"], row["height_mm"])],
                 ["生地", row["fabric_type"]],
                 ["スカート", "有り" if skirt_any else "無し"]]
     if proc == "sewing":
-        velcro = [SIDE_JA[k] for k, (kind, _) in s.items() if kind == "velcro"]
-        return [["マジックテープ", "有り" + ("(" + "・".join(velcro) + ")" if velcro else "")],
+        return [["マジックテープ", velcro_label(row.get("velcro_sides"))],
                 ["ベルクロ種別", VELCRO_JA.get(row.get("velcro_type"), "-")],
                 ["スカート", "有り" if skirt_any else "無し"],
                 ["スカート取付", SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "なし") if skirt_any else "なし"],

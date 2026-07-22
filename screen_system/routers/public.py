@@ -70,13 +70,15 @@ def create_order(order: OrderIn):
                      width_mm, height_mm, quantity, sheet_side, pair_item_no,
                      process_top, process_top_mm, process_bottom,
                      process_bottom_mm, process_left, process_left_mm, process_right, process_right_mm,
+                     velcro_sides, has_skirt,
                      velcro_type, skirt_attachment, skirt_no_seam, eyelet_method,
                      fire_cert_no)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING barcode""",
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING barcode""",
                 (order_id, item_no, barcode, it.product_type, fabric_type, width_mm, height_mm,
                  it.quantity, sheet_side, pair_item_no,
                  it.process_top, it.process_top_mm, it.process_bottom, it.process_bottom_mm,
                  it.process_left, it.process_left_mm, it.process_right, it.process_right_mm,
+                 it.velcro_sides, it.has_skirt,
                  it.velcro_type, it.skirt_attachment, it.skirt_no_seam, it.eyelet_method,
                  it.fire_cert_no),
             )
@@ -243,12 +245,14 @@ def api_label(barcode: str):
         "height_mm": row["height_mm"],
         "product": _PRODUCT_JP.get(row["product_type"], "1枚"),
         "set_quantity": row["quantity"],
+        # スカートは下辺のみ。ハトメと同居しうるので _proc に渡して併記させる。
         "processing": {
             "top": _proc(*s["top"]),
-            "bottom": _proc(*s["bottom"]),
+            "bottom": _proc(*s["bottom"], skirt=bool(row.get("has_skirt"))),
             "left": _proc(*s["left"]),
             "right": _proc(*s["right"]),
         },
+        "velcroSides": row.get("velcro_sides"),
         "bohenNumber": row["fire_cert_no"] or "",
         "qrValue": "https://cdigolf.base.ec/",
     }

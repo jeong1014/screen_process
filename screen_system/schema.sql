@@ -110,7 +110,8 @@ CREATE TABLE order_items (
     height_mm    INTEGER NOT NULL CHECK (height_mm > 0),
     quantity     INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
 
-    -- 4辺の加工: 種別 + ハトメ間隔(mm)。ミシン/ハトメ工程の表示に使う
+    -- 4辺の加工 = ハトメ('none' か 'eyelet')+ 間隔(mm)。
+    -- ベルクロ/スカートは同じ辺に同時に付くため、下の velcro_sides / has_skirt で別に持つ。
     process_top       process_kind NOT NULL DEFAULT 'none',
     process_top_mm    INTEGER,
     process_bottom    process_kind NOT NULL DEFAULT 'none',
@@ -128,6 +129,9 @@ CREATE TABLE order_items (
     pair_item_no  SMALLINT,                 -- 対になるもう片方の item_no(同一 order_id 内)
 
     -- 販売サイトのオプション体系に合わせた追加項目
+    -- ベルクロ面数: NULL=なし / 3=上左右(スカートの付く下辺を除く) / 4=四辺
+    velcro_sides     SMALLINT CHECK (velcro_sides IS NULL OR velcro_sides IN (3, 4)),
+    has_skirt        BOOLEAN NOT NULL DEFAULT false,   -- スカート有無(下辺のみ)
     velcro_type      velcro_kind,
     skirt_attachment skirt_attach_kind,
     skirt_no_seam    BOOLEAN NOT NULL DEFAULT false,

@@ -2538,17 +2538,18 @@
       return `${d.set_quantity} / 合計${d.total_sheets}枚`;
     }
 
+    // ハトメとスカートは同じ辺(下辺)に同時に付くので「ハトメ P300＋スカート」と併記する
     function procText(p) {
-      if (!p || !p.type || p.type === "none") return "なし";
-      if (p.type === "eyelet") return `ハトメ P${p.spacing || ""}`.trim();
+      if (!p || !p.type || p.type === "none") return p && p.skirt ? "スカート" : "なし";
+      if (p.type === "eyelet") return (`ハトメ P${p.spacing || ""}`.trim()) + (p.skirt ? "＋スカート" : "");
       if (p.type === "skirt") return "スカート";
       if (p.type === "velcro") return "ベルクロ";
       return String(p.type);
     }
 
     function procShort(p) {
-      if (!p || !p.type || p.type === "none") return "なし";
-      if (p.type === "eyelet") return `P${p.spacing || ""}`.trim();
+      if (!p || !p.type || p.type === "none") return p && p.skirt ? "スカート" : "なし";
+      if (p.type === "eyelet") return (`P${p.spacing || ""}`.trim()) + (p.skirt ? "＋スカート" : "");
       if (p.type === "skirt") return "スカート";
       if (p.type === "velcro") return "ベルクロ";
       return String(p.type);

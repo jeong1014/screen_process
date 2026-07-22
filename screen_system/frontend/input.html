@@ -80,9 +80,8 @@
 <script>
   // ===== 設定 =====
   const API_BASE = "";  // 同じサーバーから配信されるなら空値。別の場所なら "http://localhost:8000"
-  // 辺の加工: スカートは下辺のみ。上・左・右は なし/ハトメ だけ選べる。
-  const PROC_SIDE   = [["none","なし"],["eyelet","ハトメ"]];                     // 上・左・右
-  const PROC_BOTTOM = [["none","なし"],["eyelet","ハトメ"],["skirt","スカート"]]; // 下のみ
+  // 辺の加工 = ハトメのみ。ベルクロ・スカートは同じ辺に同時に付くので別項目で持つ。
+  const PROC_SIDE = [["none","なし"],["eyelet","ハトメ"]];
   const EYELET_MM = ["", "300", "200", "400"];  // 先頭""=未選択(ハトメ以外は空欄)。ハトメ選択時は300mmが既定
   const FABRIC = ["LN","DP","SDP"];
   const PRODUCT = ["single","two_sheet_set","skirt"];
@@ -101,13 +100,13 @@
       mmSel.value = "";
     }
   }
-  // 上・左・右 は既定で「ハトメ P300」。下辺のみ既定「なし」で、スカートを選べる。
+  // 上・左・右 は既定で「ハトメ P300」。下辺はスカートが付くことが多いので既定「なし」。
+  // (下辺もハトメを選べる — 注文によってスカート+ハトメの両方が付く)
   function procRow(side, labelJa){
     const isBottom = (side === "bottom");
-    const list     = isBottom ? PROC_BOTTOM : PROC_SIDE;
     const defKind  = isBottom ? "none" : "eyelet";
     const defMm    = isBottom ? ""     : "300";
-    const opts = list.map(([v,l])=>`<option value="${v}"${v===defKind?" selected":""}>${l}</option>`).join("");
+    const opts = PROC_SIDE.map(([v,l])=>`<option value="${v}"${v===defKind?" selected":""}>${l}</option>`).join("");
     const mms  = EYELET_MM.map(v=>`<option value="${v}"${v===defMm?" selected":""}>${v?v+"mm":"-"}</option>`).join("");
     return `<div class="procrow">
       <span>${labelJa}</span>
@@ -141,7 +140,7 @@
           <div><label>高さ H(mm) 裏面</label><input type="number" data-f="back_height_mm" placeholder="2500"></div>
         </div>
       </div>
-      <label style="margin-top:8px">加工(種別 + ハトメ間隔mm)</label>
+      <label style="margin-top:8px">ハトメ(辺ごと + 間隔mm) <span style="color:var(--muted)">※ベルクロ・スカートは下で別途指定</span></label>
       ${procRow("top","上")}${procRow("bottom","下")}${procRow("left","左")}${procRow("right","右")}
       <div class="grid g3" style="margin-top:8px">
         <div><label>ベルクロ面数</label><select data-f="velcro_sides">
@@ -150,22 +149,26 @@
         <div class="velcrotype"><label>ベルクロ種別</label><select data-f="velcro_type">
           <option value="male">オス</option><option value="female">メス</option>
         </select></div>
-        <div><label>スカート取付方法</label><select data-f="skirt_attachment">
-          <option value="">-</option><option value="sew">縫い付け</option><option value="velcro">マジックテープ</option>
-        </select></div>
-      </div>
-      <div class="grid g3" style="margin-top:6px">
         <div><label>ハトメ配置方式</label><select data-f="eyelet_method">
           <option value="">-</option><option value="A">方式A(コーナー基準)</option><option value="B">方式B(間隔均等)</option><option value="C">方式C(未定)</option>
         </select></div>
       </div>
-      <label style="display:flex;flex-direction:row;align-items:center;gap:6px;margin-top:8px">
-        <input type="checkbox" data-f="skirt_no_seam" style="width:auto">スカート継ぎ目なし(シームレス)
-      </label>
+      <div class="grid g3" style="margin-top:6px">
+        <div><label>スカート(下辺)</label><select data-f="has_skirt" onchange="onSkirtChange(this)">
+          <option value="false">無し</option><option value="true">有り</option>
+        </select></div>
+        <div class="skirtopt"><label>スカート取付方法</label><select data-f="skirt_attachment">
+          <option value="">-</option><option value="sew">縫い付け</option><option value="velcro">マジックテープ</option>
+        </select></div>
+        <div class="skirtopt"><label>スカート継ぎ目</label><select data-f="skirt_no_seam">
+          <option value="false">通常</option><option value="true">シームレス</option>
+        </select></div>
+      </div>
       <label>防炎認証番号</label><input data-f="fire_cert_no" placeholder="BOEN-2026-...">
     `;
     document.getElementById("items").appendChild(div);
     onProductChange(div.querySelector('[data-f="product_type"]'));
+    onSkirtChange(div.querySelector('[data-f="has_skirt"]'));
   }
   addItem();
 
@@ -175,6 +178,14 @@
     const cert = sel.closest(".item").querySelector('[data-f="fire_cert_no"]');
     cert.disabled = noFlame;
     if(noFlame) cert.value = "";
+  }
+
+  // スカート「無し」なら取付方法・継ぎ目は不要なので隠す
+  function onSkirtChange(sel){
+    const on = sel.value === "true";
+    sel.closest(".item").querySelectorAll(".skirtopt").forEach(e=>{
+      e.style.visibility = on ? "visible" : "hidden";
+    });
   }
 
   // 商品種別で切り替わるもの
@@ -211,6 +222,11 @@
     // 「防炎なし」時は認証番号の代わりに非防炎の印を入れる(DB列は既存の fire_cert_no のまま)
     if(o.flame === "no") o.fire_cert_no = "非防炎";
     delete o.flame;
+    // select の文字列を DB の型に合わせる
+    o.has_skirt     = (o.has_skirt === "true");
+    o.skirt_no_seam = (o.skirt_no_seam === "true");
+    o.velcro_sides  = o.velcro_sides ? Number(o.velcro_sides) : null;
+    if(!o.has_skirt){ o.skirt_attachment = null; o.skirt_no_seam = false; }
     return o;
   }
   async function submitOrder(){
