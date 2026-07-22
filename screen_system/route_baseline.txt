@@ -12,6 +12,7 @@ GET     /api/admin/fire-report
 GET     /api/admin/fire-report.csv
 GET     /api/admin/inv
 GET     /api/admin/inv/history
+DELETE  /api/admin/inv/history/{tx_id}
 POST    /api/admin/inv/item
 DELETE  /api/admin/inv/item/{code}
 POST    /api/admin/inv/{code}/adjust
@@ -38,6 +39,7 @@ POST    /api/admin/purchase/{po_id}/cancel
 POST    /api/admin/purchase/{po_id}/order
 GET     /api/admin/scans
 GET     /api/admin/scans.csv
+DELETE  /api/admin/scans/{scan_id}
 GET     /api/admin/settings
 POST    /api/admin/settings
 GET     /api/admin/shipments

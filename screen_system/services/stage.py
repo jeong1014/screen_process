@@ -19,7 +19,7 @@ from db import db
 from services.formatting import (
     worker_payload, size_str, stage_to_proc, _proc_fields, _eyelet_diagram_info,
 )
-from services.shipping import auto_print_shipping_slip, fetch_order_by_no
+from services.shipping import auto_print_shipping_slip, fetch_order_by_no, mark_order_shipped
 
 
 # =============================================================================
@@ -91,6 +91,9 @@ def move_stage(order_no: str, delta: int):
             #       고객 정보 없이 인쇄된다. (기존 동작 유지 — 별건으로 수정 필요)
             order_info = fetch_order_by_no(cur, order_no)
             auto_print_shipping_slip(cur, order_no, row["order_id"], order_info)
+            # 注文の全明細が終わっていれば出荷済みとして記録する
+            mark_order_shipped(cur, row["order_id"])
+            conn.commit()
 
     return worker_payload(row, pair_bc)
 
@@ -128,6 +131,9 @@ def monitor_scan(proc: str, barcode: str):
                          started_at=COALESCE(started_at, now()) WHERE id=%s""", (new, it["id"]))
         cur.execute("INSERT INTO scan_events (order_item_id, stage_no, event_type, station) VALUES (%s,%s,%s,%s)",
                     (it["id"], new, et, "monitor_" + actual_proc))
+        # 最終工程(ハトメ完了)まで来たら、注文全体が終わっているか見て出荷済みにする
+        if new == MAX_STAGE:
+            mark_order_shipped(cur, it["order_id"])
         conn.commit()
     out = {"ok": True, "result": result, "barcode": bc, "fabric": it["fabric_type"],
            "size": size_str(it["width_mm"], it["height_mm"]), "stage_name": STAGE_NAME.get(new, ""),

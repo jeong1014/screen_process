@@ -333,6 +333,11 @@
             ],
             "title": "Fire Cert No"
           },
+          "has_skirt": {
+            "default": false,
+            "title": "Has Skirt",
+            "type": "boolean"
+          },
           "height_mm": {
             "title": "Height Mm",
             "type": "integer"
@@ -426,6 +431,17 @@
             "default": false,
             "title": "Skirt No Seam",
             "type": "boolean"
+          },
+          "velcro_sides": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Velcro Sides"
           },
           "velcro_type": {
             "default": "male",
@@ -1453,6 +1469,54 @@
           }
         },
         "summary": "Admin Inv History"
+      }
+    },
+    "/api/admin/inv/history/{tx_id}": {
+      "delete": {
+        "description": "在庫履歴を1件削除する。\n\n注意: 履歴を消しても inv_item.remain(残数)は変わらない。\n残数を直したい場合は在庫画面の「調整」を使うこと。",
+        "operationId": "admin_inv_history_delete_api_admin_inv_history__tx_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tx_id",
+            "required": true,
+            "schema": {
+              "title": "Tx Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-admin-pass",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Admin-Pass",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Inv History Delete"
       }
     },
     "/api/admin/inv/item": {
@@ -2917,6 +2981,54 @@
           }
         },
         "summary": "Admin Scans Csv"
+      }
+    },
+    "/api/admin/scans/{scan_id}": {
+      "delete": {
+        "description": "スキャン履歴を1件削除する(誤スキャン・テスト記録の掃除用)。\n\n注意: 履歴を消しても order_items.current_stage は動かない。\n工程を戻したい場合は注文詳細の「工程で補正」を使うこと。",
+        "operationId": "admin_scan_delete_api_admin_scans__scan_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scan_id",
+            "required": true,
+            "schema": {
+              "title": "Scan Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-admin-pass",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Admin-Pass",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Scan Delete"
       }
     },
     "/api/admin/settings": {

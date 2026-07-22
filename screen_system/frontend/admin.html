@@ -173,6 +173,8 @@ RENDER.screens=()=>{
     ["/monitor/eyelet","ハトメモニター","ハトメステーション表示+スキャン","#0891b2"],
     ["/dashboard","ダッシュボード","全体の進捗ボード","#16a34a"],
     ["/input","注文入力","手動で注文を登録","#6b7280"],
+    ["/shop","ショップ","販売サイト(BASE)を開く","#d946ef"],
+    ["/invscan","在庫QRスキャン","在庫QRを読んで消尽","#0891b2"],
   ];
   const card=([u,t,d,c])=>`<a href="${u}" target="_blank"
       style="display:block;padding:16px;border:1px solid #dfe5ec;border-left:5px solid ${c};border-radius:12px;
@@ -304,6 +306,7 @@ async function saveShipment(orderNo){
 // ===== 出荷一覧 =====
 RENDER.ship=()=>{
   document.getElementById("main").innerHTML=`<div class="panel"><h2>出荷一覧</h2>
+    <div class="muted" style="margin:-4px 0 12px;font-size:12px">注文の全明細がハトメ完了(工程6)になった時点で自動的に出荷済みとして記録されます。</div>
     <div id="shipBody" class="muted">読み込み中...</div></div>`;
   loadShipments();
 };
@@ -311,12 +314,13 @@ async function loadShipments(){
   try{
     const d=await api("/api/admin/shipments");
     document.getElementById("shipBody").innerHTML=d.length?`<div class="scroll"><table>
-      <tr><th>注文番号</th><th>顧客</th><th>送り状番号</th><th>追跡番号</th><th>配送状況</th><th>BizLogi</th><th>個口</th></tr>
+      <tr><th>注文番号</th><th>顧客</th><th>送り状番号</th><th>出荷日時</th><th>追跡番号</th><th>配送状況</th><th>BizLogi</th><th>個口</th></tr>
       ${d.map(s=>`<tr class="click" onclick="orderDetail('${esc(s.order_no)}')">
         <td><b>${esc(s.order_no)}</b></td><td>${esc(s.customer_name)}</td><td>${esc(s.shipment_no)}</td>
+        <td>${esc(s.shipped_at||'—')}</td>
         <td>${esc(s.tracking_no||'—')}</td><td><span class="pill">${esc(SHIP_JA[s.shipping_status]||s.shipping_status)}</span></td>
         <td><span class="pill">${esc(BIZ_JA[s.bizlogi_status]||s.bizlogi_status)}</span></td><td>${s.package_count}</td></tr>`).join("")}</table></div>`
-      :`<div class="muted">出荷データなし</div>`;
+      :`<div class="muted">出荷データなし(ハトメ完了した注文がまだありません)</div>`;
   }catch(e){ document.getElementById("shipBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
 }
 
@@ -583,6 +587,19 @@ function setHMode(m){
   }
   loadHistory();
 }
+// 履歴の行ごとの削除ボタン。id が無い古い応答では何も出さない。
+function delBtn(id, label){
+  if(id==null) return "";
+  return `<button class="b b-gray" title="この履歴を削除"
+    onclick="event.stopPropagation();delHistory(${id},'${String(label).replace(/'/g,"\\'")}')">✕</button>`;
+}
+async function delHistory(id, label){
+  if(!confirm("この履歴を削除しますか?\n\n"+label+"\n\n※削除しても在庫の残数・工程(stage)は変わりません。")) return;
+  const url = HMODE==="inv" ? "/api/admin/inv/history/"+id : "/api/admin/scans/"+id;
+  try{ await api(url,{method:"DELETE"}); toast("削除しました"); loadHistory(); }
+  catch(e){ alert(e.message); }
+}
+
 function histParams(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:"";};
   const p=new URLSearchParams();
@@ -596,19 +613,21 @@ async function loadHistory(){
   try{
     if(HMODE==="inv"){
       const d=await api("/api/admin/inv/history"); HROWS=d;
-      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件</div><div class="scroll"><table>
-        <tr><th>日時</th><th>コード</th><th>品名</th><th>製品番号</th><th>区分</th><th>増減</th><th>残</th><th>担当</th></tr>
+      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件 <span style="color:var(--danger)">※履歴を消しても在庫の残数は変わりません</span></div><div class="scroll"><table>
+        <tr><th>日時</th><th>コード</th><th>品名</th><th>製品番号</th><th>区分</th><th>増減</th><th>残</th><th>担当</th><th></th></tr>
         ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.code)}</td><td>${esc(x.name||'')}</td><td>${esc(x.serial||'')}</td>
           <td><span class="pill">${esc(x.reason)}</span></td>
           <td style="color:${x.delta<0?'var(--danger)':'var(--ok)'}"><b>${x.delta>0?'+':''}${x.delta}</b></td>
-          <td>${x.balance==null?'':x.balance}</td><td>${esc(x.worker||'')}</td></tr>`).join("")}</table></div>`
+          <td>${x.balance==null?'':x.balance}</td><td>${esc(x.worker||'')}</td>
+          <td>${delBtn(x.id, `${x.t} ${x.code} ${x.delta>0?'+':''}${x.delta}`)}</td></tr>`).join("")}</table></div>`
         :`<div class="muted">履歴なし</div>`;
     }else{
       const d=await api("/api/admin/scans?"+p.toString()); HROWS=d;
-      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件</div><div class="scroll"><table>
-        <tr><th>日時</th><th>バーコード</th><th>注文番号</th><th>工程</th><th>種別</th><th>端末</th></tr>
+      document.getElementById("hBody").innerHTML=d.length?`<div class="muted" style="margin-bottom:6px">${d.length}件 <span style="color:var(--danger)">※履歴を消しても工程(stage)は戻りません</span></div><div class="scroll"><table>
+        <tr><th>日時</th><th>バーコード</th><th>注文番号</th><th>工程</th><th>種別</th><th>端末</th><th></th></tr>
         ${d.map(x=>`<tr><td>${esc(x.t)}</td><td>${esc(x.barcode)}</td><td>${esc(x.order_no)}</td>
-          <td>${esc(x.stage_name)}</td><td>${esc(x.event)}</td><td>${esc(x.station||'')}</td></tr>`).join("")}</table></div>`
+          <td>${esc(x.stage_name)}</td><td>${esc(x.event)}</td><td>${esc(x.station||'')}</td>
+          <td>${delBtn(x.id, `${x.t} ${x.barcode} ${x.stage_name}`)}</td></tr>`).join("")}</table></div>`
         :`<div class="muted">履歴なし</div>`;
     }
   }catch(e){ document.getElementById("hBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }

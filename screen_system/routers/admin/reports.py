@@ -5,7 +5,7 @@
 import csv
 import io
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from config import (
@@ -28,7 +28,7 @@ def _scan_rows(cur, q="", stage="", date_from="", date_to="", limit=500):
         where.append("se.stage_no=%s"); params.append(int(stage))
     if date_from: where.append("se.scanned_at >= %s"); params.append(date_from)
     if date_to:   where.append("se.scanned_at < (%s::date + 1)"); params.append(date_to)
-    cur.execute(f"""SELECT se.scanned_at, se.stage_no, se.event_type, se.station, se.worker,
+    cur.execute(f"""SELECT se.id, se.scanned_at, se.stage_no, se.event_type, se.station, se.worker,
                            oi.barcode, o.order_no
                     FROM scan_events se JOIN order_items oi ON oi.id = se.order_item_id
                     JOIN orders o ON o.id = oi.order_id
@@ -41,9 +41,26 @@ def admin_scans(q: str = "", stage: str = "", date_from: str = "", date_to: str 
                 limit: int = 300, _=Depends(require_admin)):
     with db() as conn, conn.cursor() as cur:
         rows = _scan_rows(cur, q, stage, date_from, date_to, limit)
-    return [{"t": r["scanned_at"].strftime("%Y-%m-%d %H:%M"), "barcode": r["barcode"], "order_no": r["order_no"],
+    return [{"id": r["id"],
+             "t": r["scanned_at"].strftime("%Y-%m-%d %H:%M"), "barcode": r["barcode"], "order_no": r["order_no"],
              "stage": r["stage_no"], "stage_name": STAGE_NAME.get(r["stage_no"], ""),
              "event": r["event_type"], "station": r["station"], "worker": r["worker"]} for r in rows]
+
+
+@router.delete("/api/admin/scans/{scan_id}")
+def admin_scan_delete(scan_id: int, _=Depends(require_admin)):
+    """スキャン履歴を1件削除する(誤スキャン・テスト記録の掃除用)。
+
+    注意: 履歴を消しても order_items.current_stage は動かない。
+    工程を戻したい場合は注文詳細の「工程で補正」を使うこと。
+    """
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM scan_events WHERE id=%s", (scan_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    if not deleted:
+        raise HTTPException(404, "該当する履歴がありません")
+    return {"ok": True, "deleted": deleted}
 
 
 @router.get("/api/admin/scans.csv")

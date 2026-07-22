@@ -210,15 +210,32 @@ def admin_inv_reorder(code: str, body: InvReorderIn, _=Depends(require_admin)):
 @router.get("/api/admin/inv/history")
 def admin_inv_history(limit: int = 300, _=Depends(require_admin)):
     with db() as conn, conn.cursor() as cur:
-        cur.execute("""SELECT t.created_at, t.code, i.name, t.serial, t.delta, t.reason,
+        cur.execute("""SELECT t.id, t.created_at, t.code, i.name, t.serial, t.delta, t.reason,
                               t.balance_after, t.note, t.worker
                        FROM inv_tx t LEFT JOIN inv_item i ON i.code = t.code
                        ORDER BY t.created_at DESC LIMIT %s""", (limit,))
         rows = cur.fetchall()
     RJA = {"issue": "発行(入庫)", "consume": "消尽", "adjust": "調整"}
-    return [{"t": r["created_at"].strftime("%Y-%m-%d %H:%M"), "code": r["code"], "name": r["name"],
+    return [{"id": r["id"],
+             "t": r["created_at"].strftime("%Y-%m-%d %H:%M"), "code": r["code"], "name": r["name"],
              "serial": r["serial"], "delta": r["delta"], "reason": RJA.get(r["reason"], r["reason"]),
              "balance": r["balance_after"], "note": r["note"], "worker": r["worker"]} for r in rows]
+
+
+@router.delete("/api/admin/inv/history/{tx_id}")
+def admin_inv_history_delete(tx_id: int, _=Depends(require_admin)):
+    """在庫履歴を1件削除する。
+
+    注意: 履歴を消しても inv_item.remain(残数)は変わらない。
+    残数を直したい場合は在庫画面の「調整」を使うこと。
+    """
+    with db() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM inv_tx WHERE id=%s", (tx_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    if not deleted:
+        raise HTTPException(404, "該当する履歴がありません")
+    return {"ok": True, "deleted": deleted}
 
 
 @router.post("/api/admin/inv/item")

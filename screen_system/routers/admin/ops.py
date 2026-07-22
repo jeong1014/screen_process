@@ -24,7 +24,9 @@ def admin_shipments(_=Depends(require_admin)):
         rows = cur.fetchall()
     return [{"order_no": r["order_no"], "customer_name": r["customer_name"], "shipment_no": r["shipment_no"],
              "tracking_no": r["tracking_no"], "shipping_status": r["shipping_status"],
-             "bizlogi_status": r["bizlogi_status"], "package_count": r["package_count"]} for r in rows]
+             "bizlogi_status": r["bizlogi_status"], "package_count": r["package_count"],
+             "shipped_at": r["shipped_at"].strftime("%Y-%m-%d %H:%M") if r["shipped_at"] else None}
+            for r in rows]
 
 
 @router.post("/api/admin/shipments")
