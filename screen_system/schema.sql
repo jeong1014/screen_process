@@ -2,13 +2,13 @@
 -- スクリーン原団 工場工程管理システム  —  PostgreSQL スキーマ (v2)
 -- 既存の作業者画面(worker_v5) / ダッシュボード(dashboard_v2_2) の実モデルに整合
 --
--- 進行状態 stage (0〜8) を single source of truth とする:
+-- 進行状態 stage (0〜6) を single source of truth とする:
 --   0=受付
 --   1=裁断中  2=裁断完了
 --   3=ミシン中 4=ミシン完了
---   5=ハトメ中 6=ハトメ完了
---   7=梱包中  8=梱包完了(=出荷準備完了)
+--   5=ハトメ中 6=ハトメ完了(=最終完了 / 出荷準備完了。ここで送り状を自動印刷)
 --   → 奇数=作業中, 偶数=完了。スキャン1回で +1、戻る(UNDO)で -1。
+--   ※ 梱包(旧 7,8)工程は廃止。ハトメ完了が最終段階。
 --
 -- 「注文番号(製品番号)」= ラベルのバーコード = order_items.barcode (スキャン単位)
 -- =============================================================================
@@ -47,18 +47,18 @@ CREATE TYPE sync_action    AS ENUM ('import_order', 'confirm_payment', 'issue_la
 CREATE TYPE sync_status    AS ENUM ('success', 'failed');
 
 -- ---------------------------------------------------------------------------
--- production_stages — 工程マスタ (0〜8)
+-- production_stages — 工程マスタ (0〜6)  ※梱包(旧7,8)は廃止
 -- ---------------------------------------------------------------------------
 CREATE TABLE production_stages (
-    stage_no   SMALLINT PRIMARY KEY CHECK (stage_no BETWEEN 0 AND 8),
+    stage_no   SMALLINT PRIMARY KEY CHECK (stage_no BETWEEN 0 AND 6),
     code       TEXT NOT NULL UNIQUE,
     name_ja    TEXT NOT NULL,
     name_ko    TEXT NOT NULL,
-    proc_key   TEXT,                    -- cutting/sewing/eyelet/packing (受付は NULL)
+    proc_key   TEXT,                    -- cutting/sewing/eyelet (受付は NULL)
     phase      TEXT,                    -- wip(作業中) / done(完了) / (受付は NULL)
     sort_order SMALLINT NOT NULL
 );
-COMMENT ON TABLE production_stages IS '工程マスタ。order_items.current_stage(0〜8)の参照先。奇数=作業中, 偶数=完了';
+COMMENT ON TABLE production_stages IS '工程マスタ。order_items.current_stage(0〜6)の参照先。奇数=作業中, 偶数=完了。ハトメ完了(6)が最終段階';
 
 INSERT INTO production_stages (stage_no, code, name_ja, name_ko, proc_key, phase, sort_order) VALUES
     (0, 'received',     '受付',     '접수',     NULL,      NULL,  0),
@@ -67,9 +67,7 @@ INSERT INTO production_stages (stage_no, code, name_ja, name_ko, proc_key, phase
     (3, 'sewing_wip',   'ミシン中', '미싱중',   'sewing',  'wip', 3),
     (4, 'sewing_done',  'ミシン完了','미싱완료','sewing',  'done',4),
     (5, 'eyelet_wip',   'ハトメ中', '하토메중', 'eyelet',  'wip', 5),
-    (6, 'eyelet_done',  'ハトメ完了','하토메완료','eyelet', 'done',6),
-    (7, 'packing_wip',  '梱包中',   '포장중',   'packing', 'wip', 7),
-    (8, 'packing_done', '梱包完了', '포장완료', 'packing', 'done',8);
+    (6, 'eyelet_done',  'ハトメ完了','하토메완료','eyelet', 'done',6);
 
 -- ---------------------------------------------------------------------------
 -- orders — 注文ヘッダ
@@ -125,7 +123,7 @@ CREATE TABLE order_items (
     fire_cert_no  TEXT,
 
     -- 2枚セット(two_sheet_set)は表面/裏面をそれぞれ独立した order_items 行として管理する
-    -- (裁断/ミシン/ハトメ/梱包を2回スキャンする必要があるため)。single/skirt では NULL。
+    -- (裁断/ミシン/ハトメを2回スキャンする必要があるため)。single/skirt では NULL。
     sheet_side    sheet_side_kind,          -- 'front' または 'back'(2枚セットのみ)
     pair_item_no  SMALLINT,                 -- 対になるもう片方の item_no(同一 order_id 内)
 

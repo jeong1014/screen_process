@@ -6,42 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>スクリーン生地ラベル</title>
   <style>
-    @page {
-      size: 110mm 290mm;
-      margin: 0;
-    }
-
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-    }
-
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      color-adjust: exact;
-    }
+    @page { size: 110mm 449.2mm; margin: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
 
     .label {
-      width: 110mm;
-      height: 290mm;
-      margin: 0 auto;
-      padding: 30mm 8mm 6mm 8mm;
-      background: #fff;
-      color: #000;
+      position: relative;
+      width: 110mm; height: 449.2mm; margin: 0 auto; background: #fff; color: #000;
       font-family: Arial, Helvetica, "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      overflow: hidden;
-      page-break-after: always;
+      overflow: hidden; page-break-after: always;
     }
     .label:last-child { page-break-after: auto; }
+    .label > * { position: absolute; }
 
-    /* 複数枚(2枚セットの表/裏など)をまとめて表示する時の画面プレビュー用 */
     @media screen {
       body { background: #eef1f5; }
       #sheet { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 0; }
@@ -49,317 +26,62 @@
       .labelerr { color: #c0392b; font: 14px sans-serif; text-align: center; padding: 20px; }
     }
 
-    /* ミシン目 */
-    .perf {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 1mm;
-    }
+    /* ミシン目(上/下) */
+    .perf { display: flex; justify-content: space-between; align-items: center; }
+    .perf i { width: 3.4mm; height: 3.4mm; border-radius: 50%; background: #000; display: block; }
+    .perf.top { left: 0.6mm; right: 0.6mm; top: 27.9mm; }
+    .perf.bottom { left: 0.6mm; right: 0.6mm; top: 412.5mm; }
 
-    .perf i {
-      width: 1.9mm;
-      height: 1.9mm;
-      border-radius: 50%;
-      background: #111;
-      display: block;
-    }
+    /* ヘッダー(生地コード + 和名) */
+    .head { left: 8.8mm; top: 44.5mm; }
+    .head .code { font-family: Arial, Helvetica, sans-serif; font-weight: 400; font-size: 27.5mm; line-height: 1; letter-spacing: -0.5mm; }
+    .head .name { font-size: 4.8mm; font-weight: 500; letter-spacing: -0.1mm; margin-top: -2.4mm; white-space: nowrap; }
 
-    /* 上部クラスタ(ヘッダー・仕様・バーコード) */
-    .cluster-top {
-      margin-top: 8mm;
-    }
+    /* 仕様テーブル(項目は従来どおり Fabric/Size/上端/下端/左側/右側) */
+    table.spec { left: 8.8mm; top: 85.6mm; border-collapse: collapse; }
+    table.spec td { font-size: 4.6mm; line-height: 5.0mm; padding: 0; vertical-align: top; white-space: nowrap; }
+    table.spec .en { font-weight: 800; width: 19.1mm; }
+    table.spec .jp { font-weight: 500; width: 24.2mm; }
+    table.spec .v1 { font-weight: 500; }
 
-    .cluster-top>* {
-      margin: 0;
-    }
+    /* バーコード */
+    .barcode-wrap { left: 0; right: 0; top: 124.5mm; text-align: center; }
+    .barcode-wrap svg { width: 104mm; height: 18.7mm; display: inline-block; }
+    .barcode-text { font-size: 3.0mm; font-weight: 500; letter-spacing: 0.3mm; margin-top: 1.6mm; }
 
-    .head .code {
-      font-size: 23mm;
-      font-weight: 900;
-      line-height: 1;
-      letter-spacing: -0.5mm;
-    }
+    /* ブランドロゴ / 洗濯表示 / CDIロゴ(中央寄せラッパ) */
+    .imgwrap { left: 0; right: 0; text-align: center; }
+    .gorilla-w { top: 155.6mm; }
+    .gorilla-w img { width: 108.4mm; height: auto; display: inline-block; }
+    .wash-w { top: 228.3mm; }
+    .wash-w img { width: 103.5mm; height: auto; display: inline-block; }
 
-    .head .name {
-      font-size: 6.2mm;
-      font-weight: 800;
-      margin-top: 1.8mm;
-      letter-spacing: 0.05mm;
-    }
+    /* QR(中央 CDI マーク付き) */
+    .qr-w { left: 0; right: 0; top: 267.4mm; text-align: center; }
+    .qrbox { display: inline-block; position: relative; width: 58.2mm; height: 58.2mm; }
+    .qrbox #qrcode img { width: 58.2mm; height: 58.2mm; display: block; image-rendering: pixelated; }
+    .qrbox .logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 11mm; height: 11mm; background: #fff; display: flex; align-items: center; justify-content: center; }
+    .qrbox .logo img { width: 9mm; height: auto; display: block; }
 
-    table.spec {
-      border-collapse: collapse;
-      margin-top: 1.5mm;
-      width: 100%;
-    }
+    /* フッター(会社情報) */
+    .foot { left: 0; right: 0; top: 334.6mm; text-align: center; }
+    .foot .company { font-size: 3.4mm; font-weight: 600; line-height: 4.5mm; }
+    .foot .addr { font-size: 3.4mm; font-weight: 500; line-height: 4.5mm; }
+    .design { left: 0; right: 0; top: 353.8mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }
+    .cdilogo-w { top: 362.9mm; }
+    .cdilogo-w img { width: 94.5mm; height: auto; display: inline-block; }
 
-    table.spec td {
-      font-size: 4.8mm;
-      line-height: 8.1mm;
-      padding: 0;
-      vertical-align: top;
-      white-space: nowrap;
-      font-weight: 800;
-    }
+    /* ハトメ(二重丸) */
+    .eyelets { left: 0.2mm; right: 0.2mm; top: 399.8mm; display: flex; justify-content: space-between; }
+    .eyelets i { width: 7mm; height: 7mm; border-radius: 50%; border: 0.9mm solid #000; position: relative; display: block; }
+    .eyelets i::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 3.2mm; height: 3.2mm; border-radius: 50%; border: 0.7mm solid #000; }
 
-    table.spec .en {
-      font-weight: 900;
-      width: 23mm;
-    }
-
-    table.spec .jp {
-      font-weight: 800;
-      width: 28mm;
-    }
-
-    table.spec .v1 {
-      font-weight: 900;
-      width: 27mm;
-    }
-
-    table.spec .v2 {
-      font-weight: 900;
-    }
-
-    .barcode-wrap {
-      margin-top: 3mm;
-      text-align: center;
-    }
-
-    .barcode-wrap svg {
-      width: 92mm;
-      height: 30mm;
-    }
-
-    .barcode-text {
-      font-size: 4.2mm;
-      font-weight: 900;
-      letter-spacing: 0.45mm;
-      margin-top: 1.2mm;
-    }
-
-
-    /* QR + 取付方向ブロック */
-    .mid {
-      display: flex;
-      gap: 6mm;
-      align-items: stretch;
-      margin-top: 2mm;
-    }
-
-    .qr {
-      width: 48mm;
-      position: relative;
-    }
-
-    .qr img {
-      width: 48mm;
-      height: 48mm;
-      display: block;
-      image-rendering: pixelated;
-    }
-
-    .qr .logo {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 11mm;
-      height: 11mm;
-      background: #fff;
-      border-radius: 1mm;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .qr .logo img {
-      width: 9.5mm;
-      height: auto;
-      display: block;
-    }
-
-    /* 取付方向: 方向図 (orientation) */
-    .orient {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .orient .title {
-      font-size: 3.4mm;
-      font-weight: 800;
-      margin-bottom: 4mm;
-      letter-spacing: 0.2mm;
-    }
-
-    .odiagram {
-      border-collapse: collapse;
-    }
-
-    .odiagram td {
-      text-align: center;
-      vertical-align: middle;
-      padding: 1mm 1.5mm;
-    }
-
-    .odiagram .oc {
-      font-size: 3.0mm;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .odiagram .obox {
-      width: 22mm;
-      height: 27mm;
-      border: 0.5mm solid #000;
-    }
-
-    .obox .oarrow {
-      display: block;
-      font-size: 5.5mm;
-      line-height: 1;
-    }
-
-    .obox .oup {
-      display: block;
-      font-size: 3.6mm;
-      font-weight: 800;
-      margin-top: 0.5mm;
-    }
-
-    .obox .ofront {
-      display: block;
-      font-size: 3.6mm;
-      font-weight: 800;
-      margin-top: 0.8mm;
-    }
-
-    /* 取付方向: 向きマーク (direction) */
-    .direction {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .direction .title {
-      font-size: 3.4mm;
-      font-weight: 800;
-      margin-bottom: 2mm;
-      letter-spacing: 0.2mm;
-    }
-
-    .direction .darrow {
-      font-size: 15mm;
-      line-height: 0.85;
-    }
-
-    .direction .dtop {
-      font-size: 4.8mm;
-      font-weight: 800;
-      margin-top: 1mm;
-    }
-
-    .direction .dhr {
-      width: 72%;
-      border-top: 0.4mm solid #000;
-      margin: 2.6mm 0;
-    }
-
-    .direction .dfront {
-      font-size: 4.8mm;
-      font-weight: 800;
-    }
-
-    .direction .dsub {
-      font-size: 2.9mm;
-      font-weight: 700;
-      margin-top: 1mm;
-    }
-
-    /* フッター */
-    .foot {
-      text-align: center;
-      line-height: 5.8mm;
-      margin-top: 7mm;
-    }
-
-    .foot .company {
-      font-size: 3.8mm;
-      font-weight: 900;
-    }
-
-    .foot .addr {
-      font-size: 3.2mm;
-      font-weight: 700;
-    }
-
-    .foot .design {
-      font-size: 3.8mm;
-      font-weight: 900;
-      margin-top: 1.8mm;
-      letter-spacing: 0.2mm;
-    }
-
-    /* Gorilla Impact Screen ブランドロゴ — Design and Quality の直後、ラベル幅いっぱいに配置 */
-    .foot .brand-logo {
-      display: block;
-      width: 100mm;          /* ラベル内容幅(94mm)+左右パディングへ約3mmずつ食い込ませて“ほぼ全幅”に */
-      max-width: none;
-      height: auto;
-      margin: 2.6mm -3mm 0;  /* 左右パディング(8mm)の一部を相殺して中央で全幅に見せる */
-    }
-
-    /* ハトメ(円) — Design and Quality の直下に詰めて配置 */
-    .eyelets {
-      display: flex;
-      justify-content: space-between;
-      padding: 0 3mm;
-      margin-top: 2.4mm;
-      margin-bottom: 2.0mm;
-    }
-
-    #perfBottom {
-      margin-top: 0;
-    }
-
-    .eyelets i {
-      width: 7mm;
-      height: 7mm;
-      border-radius: 50%;
-      border: 0.9mm solid #111;
-      position: relative;
-      display: block;
-    }
-
-    .eyelets i::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 3.2mm;
-      height: 3.2mm;
-      border-radius: 50%;
-      border: 0.7mm solid #111;
-    }
+    /* 最下部の黒帯 */
+    .blackbar { left: 0; right: 0; bottom: 0; height: 19mm; background: #000; }
 
     @media print {
-
-      html,
-      body {
-        width: 110mm;
-        height: 290mm;
-      }
-
-      .label {
-        margin: 0;
-      }
+      html, body { width: 110mm; height: 449.2mm; }
+      .label { margin: 0; }
     }
   </style>
 </head>
@@ -367,109 +89,49 @@
 <body>
   <template id="labelTpl">
   <div class="label">
-    <div class="perf" id="perfTop"></div>
+    <div class="perf top" id="perfTop"></div>
 
-    <div class="cluster-top">
-      <div class="head">
-        <div class="code" id="fCode">DP</div>
-        <div class="name" id="fName">ダブルレイヤーポリエステル生地</div>
-      </div>
-
-      <table class="spec">
-        <tr>
-          <td class="en">Fabric</td>
-          <td class="jp">生地</td>
-          <td class="v1" colspan="2" id="sFabric">DP</td>
-        </tr>
-        <tr>
-          <td class="en">Size</td>
-          <td class="jp">サイズ</td>
-          <td class="v1" colspan="2" id="sSize">W4000×H3000</td>
-        </tr>
-        <tr>
-          <td class="en">Top</td>
-          <td class="jp">上端</td>
-          <td class="v1" colspan="2" id="pTop">ハトメ P300</td>
-        </tr>
-        <tr>
-          <td class="en">Bottom</td>
-          <td class="jp">下端</td>
-          <td class="v1" colspan="2" id="pBottom">スカート</td>
-        </tr>
-        <tr>
-          <td class="en">Left</td>
-          <td class="jp">左側</td>
-          <td class="v1" colspan="2" id="pLeft">ハトメ P200</td>
-        </tr>
-        <tr>
-          <td class="en">Right</td>
-          <td class="jp">右側</td>
-          <td class="v1" colspan="2" id="pRight">ハトメ P300</td>
-        </tr>
-      </table>
-
-      <div class="barcode-wrap">
-        <svg id="barcode"></svg>
-        <div class="barcode-text" id="barcodeText">DP W2800×H3000 0204558</div>
-      </div>
+    <div class="head">
+      <div class="code" id="fCode">DP</div>
+      <div class="name" id="fName">ダブルレイヤーポリエステル生地</div>
     </div>
 
-    <!-- QR + 取付方向ブロック -->
-    <div class="mid">
-      <div class="qr">
+    <table class="spec">
+      <tr><td class="en">Fabric</td><td class="jp">生地</td><td class="v1" colspan="2" id="sFabric">DP</td></tr>
+      <tr><td class="en">Size</td><td class="jp">サイズ</td><td class="v1" colspan="2" id="sSize">W4000×H3000</td></tr>
+      <tr><td class="en">Top</td><td class="jp">上端</td><td class="v1" colspan="2" id="pTop">ハトメ P300</td></tr>
+      <tr><td class="en">Bottom</td><td class="jp">下端</td><td class="v1" colspan="2" id="pBottom">スカート</td></tr>
+      <tr><td class="en">Left</td><td class="jp">左側</td><td class="v1" colspan="2" id="pLeft">ハトメ P200</td></tr>
+      <tr><td class="en">Right</td><td class="jp">右側</td><td class="v1" colspan="2" id="pRight">ハトメ P300</td></tr>
+    </table>
+
+    <div class="barcode-wrap">
+      <svg id="barcode"></svg>
+      <div class="barcode-text" id="barcodeText">DP W2800×H3000 0204558</div>
+    </div>
+
+    <div class="imgwrap gorilla-w"><img src="/static/gorilla_logo.png" alt="ゴリラインパクト スクリーン"></div>
+    <div class="imgwrap wash-w"><img src="/static/washcare.png" alt="洗濯表示"></div>
+
+    <div class="qr-w">
+      <div class="qrbox">
         <div id="qrcode"></div>
-        <div class="logo"><img
-            src="data:image/png;base64,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"
-            alt="CDI"></div>
-      </div>
-      <div class="orient" id="midOrient">
-        <div class="title">取付方向 / ORIENTATION</div>
-        <table class="odiagram">
-          <tr>
-            <td></td>
-            <td class="oc" id="oTop">上：ハトメ P300</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td class="oc" id="oLeft">左：P200</td>
-            <td class="obox">
-              <span class="oarrow">▲</span>
-              <span class="oup">上</span>
-              <span class="ofront">表</span>
-            </td>
-            <td class="oc" id="oRight">右：なし</td>
-          </tr>
-          <tr>
-            <td></td>
-            <td class="oc" id="oBottom">下：スカート</td>
-            <td></td>
-          </tr>
-        </table>
-      </div>
-
-      <div class="direction" id="midDirection" style="display:none">
-        <div class="title">取付方向 / DIRECTION</div>
-        <div class="darrow">▲</div>
-        <div class="dtop">上 / TOP</div>
-        <div class="dhr"></div>
-        <div class="dfront">表 / FRONT</div>
-        <div class="dsub">プロジェクター側</div>
+        <div class="logo"><img src="data:image/png;base64,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" alt="CDI"></div>
       </div>
     </div>
 
-    <!-- フッター -->
     <div class="foot">
       <div class="company">株式会社シーディアイ</div>
-      <div class="addr">〒491-0922 愛知県一宮市大和町妙興寺字丹波12番</div>
-      <div class="addr">Tel 0586-27-0123&nbsp;&nbsp;&nbsp;https://www.cdi.jpn.com/</div>
-      <div class="design">Design and Quality CDI of JAPAN</div>
-      <img class="brand-logo" src="/static/gorilla_logo.png" alt="Gorilla Impact Screen">
+      <div class="addr">〒491-0922　愛知県一宮市大和町妙興寺字丹波12番</div>
+      <div class="addr">Tel　0586-27-0123　　　https://www.cdi.jpn.com/</div>
     </div>
 
-    <!-- ハトメ円 -->
-    <div class="eyelets" id="eyelets"></div>
+    <div class="design">Design and Quality CDI of JAPAN</div>
+    <div class="imgwrap cdilogo-w"><img src="/static/cdi_logo.png" alt="株式会社シーディアイ"></div>
 
-    <div class="perf" id="perfBottom"></div>
+    <div class="eyelets" id="eyelets"></div>
+    <div class="perf bottom" id="perfBottom"></div>
+    <div class="blackbar"></div>
   </div>
   </template>
 
@@ -2979,6 +2641,9 @@
           height: 150,
           width: 2
         });
+        // バーコードを枠幅いっぱいに引き伸ばす(横フル)。スキャナはバー比率で読むため問題なし。
+        const bcSvg = root.querySelector("#barcode");
+        if (bcSvg) bcSvg.setAttribute("preserveAspectRatio", "none");
       } catch (e) { console.error("barcode error:", e); }
 
       try {
@@ -2987,7 +2652,7 @@
         const qrEl = root.querySelector("#qrcode");
         qrEl.innerHTML = qr.createImgTag(5, 0);
         const img = qrEl.querySelector("img");
-        if (img) { img.style.width = "48mm"; img.style.height = "48mm"; img.style.imageRendering = "pixelated"; }
+        if (img) { img.style.width = "58.2mm"; img.style.height = "58.2mm"; img.style.imageRendering = "pixelated"; }
       } catch (e) { console.error("qr error:", e); }
 
       const mk = (el, n) => {
@@ -2995,8 +2660,8 @@
         el.innerHTML = "";
         for (let i = 0; i < n; i++) el.appendChild(document.createElement("i"));
       };
-      mk(root.querySelector("#perfTop"), 22);
-      mk(root.querySelector("#perfBottom"), 22);
+      mk(root.querySelector("#perfTop"), 24);
+      mk(root.querySelector("#perfBottom"), 24);
       mk(root.querySelector("#eyelets"), d.eyeletCircles || 7);
     }
 

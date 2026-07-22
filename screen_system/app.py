@@ -3,7 +3,7 @@
 worker_v5.html / dashboard_v2_2.html の API契約に整合。
 
 役割: ブラウザHTML(入力/作業者/ダッシュボード)と PostgreSQL の仲介。
-  進行状態 stage(0〜8) を order_items.current_stage で一元管理。
+  進行状態 stage(0〜6) を order_items.current_stage で一元管理。
   「注文番号(製品番号)」= order_items.barcode。
 
 実行:  uvicorn app:app --reload --host 0.0.0.0 --port 8000
@@ -51,13 +51,13 @@ def db():
 # =============================================================================
 SIDE_JA = {"top": "上", "bottom": "下", "left": "左", "right": "右"}
 PROC_BY_STAGE = {1: "裁断", 2: "裁断", 3: "ミシン", 4: "ミシン",
-                 5: "ハトメ", 6: "ハトメ", 7: "梱包", 8: "梱包"}
+                 5: "ハトメ", 6: "ハトメ"}
 
 # 販売サイトのオプション体系(2026-07 統合)に合わせた表示用ラベル
 VELCRO_JA = {"male": "オス", "female": "メス"}
 SKIRT_ATTACH_JA = {"sew": "縫い付け", "velcro": "マジックテープ"}
 EYELET_METHOD_JA = {"A": "方式A(コーナー基準)", "B": "方式B(間隔均等)", "C": "方式C(未定)"}
-# 2枚セット(two_sheet_set)の表面/裏面区分(裁断/ミシン/ハトメ/梱包を2回スキャンするため2行に分けて管理)
+# 2枚セット(two_sheet_set)の表面/裏面区分(裁断/ミシン/ハトメを2回スキャンするため2行に分けて管理)
 SHEET_SIDE_JA = {"front": "表面", "back": "裏面"}
 
 
@@ -134,14 +134,13 @@ def worker_payload(row, pair_barcode=None):
 
 
 def board_status(stage: int):
-    """stage(0〜8) → 各工程の working/wait/done。"""
+    """stage(0〜6) → 各工程の working/wait/done。"""
     def st(done_at, wip_at):
         return "done" if stage >= done_at else ("working" if stage == wip_at else "wait")
     return {
         "cutting": st(2, 1),
         "sewing":  st(4, 3),
         "eyelet":  st(6, 5),
-        "packing": st(8, 7),
     }
 
 # 프린터 설정 로드
@@ -365,16 +364,22 @@ def create_order(order: OrderIn):
                 created.append(insert_item(seq, barcode, it, it.fabric_type,
                                             it.width_mm, it.height_mm, None, None))
         conn.commit()
+        # ラベル自動印刷は「副作用」。注文は既に commit 済みなので、印刷や
+        # レンダリングで例外が出ても注文全体(APIレスポンス)を落とさないよう
+        # 各明細ごとに try/except で囲む。失敗はサーバーログに残す。
         for barcode in created:
-            # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
-            cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
-            item_row = cur.fetchone()
-            
-            # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
-            item_data = worker_payload(item_row)
-            
-            html_content = render_order_label(item_data)
-            silent_print_html(html_content, "order_printer")
+            try:
+                # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
+                cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
+                item_row = cur.fetchone()
+                # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
+                item_data = worker_payload(item_row)
+                html_content = render_order_label(item_data)
+                silent_print_html(html_content, "order_printer")
+            except Exception as e:
+                import traceback
+                print(f"⚠️ ラベル印刷に失敗(注文は登録済み) barcode={barcode}: {e}")
+                traceback.print_exc()
     return {"order_no": order_no, "barcodes": created}
 
 
@@ -432,7 +437,7 @@ def _move(order_no: str, delta: int):
         conn.commit()
     ###################
         if new_stage == MAX_STAGE and delta > 0:
-            print(f"📦 제품 {order_no} 최종 포장 완료 -> 송장 자동 출력 개시")
+            print(f"📦 제품 {order_no} ハトメ完了(최종) -> 송장 자동 출력 개시")
             
             # 1. 주문(고객) 정보 가져오기 (이 부분이 추가되었습니다!)
             cur.execute("SELECT * FROM orders WHERE order_no=%s", (order_no,))
@@ -507,7 +512,7 @@ def api_events(limit: int = 20):
         if et == "undo":
             ev, text = "start", f"{proc} 取消"
         elif stage == MAX_STAGE:
-            ev, text = "ship", "梱包 完了(出荷準備)"
+            ev, text = "ship", "ハトメ完了(出荷準備)"
         elif stage % 2 == 0 and stage > 0:
             ev, text = "done", f"{proc} 完了"
         else:
@@ -548,12 +553,14 @@ if os.path.isdir(FRONTEND_DIR):
 # =============================================================================
 @app.get("/label")
 def page_label_multi():
-    return FileResponse(os.path.join(FRONTEND_DIR, "label.html"))
+    # 本番ラベル = label_gorilla.html(ゴリラインパクトデザイン)。
+    # 旧 label.html は使わずバックアップとして残置。
+    return FileResponse(os.path.join(FRONTEND_DIR, "label_gorilla.html"))
 
 
 @app.get("/label/{barcode}")
 def page_label(barcode: str):
-    return FileResponse(os.path.join(FRONTEND_DIR, "label.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "label_gorilla.html"))
 
 
 # 加工種別(DB) → ラベル v6 の processing 形式
@@ -605,7 +612,7 @@ from fastapi.responses import Response
 import csv, io
 
 STAGE_NAME = {0: "受付", 1: "裁断中", 2: "裁断完了", 3: "ミシン中", 4: "ミシン完了",
-              5: "ハトメ中", 6: "ハトメ完了", 7: "梱包中", 8: "梱包完了"}
+              5: "ハトメ中", 6: "ハトメ完了"}
 
 
 def _get_setting(cur, key, default=None):
@@ -1719,8 +1726,8 @@ def _proc_fields(proc, row):
                 ["スカート取付", SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "なし") if skirt_any else "なし"],
                 ["スカート継ぎ目", ("シームレス" if row.get("skirt_no_seam") else "通常") if skirt_any else "なし"]]
     if proc == "eyelet":
-        return [["上面", eyelet_val(*s["top"])], ["下面", eyelet_val(*s["bottom"])],
-                ["左面", eyelet_val(*s["left"])], ["右面", eyelet_val(*s["right"])],
+        return [["上辺", eyelet_val(*s["top"])], ["下辺", eyelet_val(*s["bottom"])],
+                ["左辺", eyelet_val(*s["left"])], ["右辺", eyelet_val(*s["right"])],
                 ["配置方式", EYELET_METHOD_JA.get(row.get("eyelet_method"), "なし")]]
     return []
 
