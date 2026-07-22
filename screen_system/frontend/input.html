@@ -122,9 +122,12 @@
     div.innerHTML=`
       <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
       <h3>明細 #${itemSeq}</h3>
-      <div class="grid g3">
+      <div class="grid g4">
         <div><label>商品種別</label><select data-f="product_type" onchange="onProductChange(this)">${PRODUCT.map(p=>`<option>${p}</option>`).join("")}</select></div>
         <div><label>原団(表面)</label><select data-f="fabric_type">${FABRIC.map(p=>`<option>${p}</option>`).join("")}</select></div>
+        <div><label>防炎</label><select data-f="flame" onchange="onFlameChange(this)">
+          <option value="yes">防炎あり</option><option value="no">防炎なし</option>
+        </select></div>
         <div><label>数量</label><input type="number" data-f="quantity" value="1"></div>
       </div>
       <div class="grid g2" style="margin-top:6px">
@@ -159,9 +162,6 @@
       <label style="display:flex;flex-direction:row;align-items:center;gap:6px;margin-top:8px">
         <input type="checkbox" data-f="skirt_no_seam" style="width:auto">スカート継ぎ目なし(シームレス)
       </label>
-      <label style="display:flex;flex-direction:row;align-items:center;gap:6px;margin-top:8px">
-        <input type="checkbox" data-f="no_flame" style="width:auto" onchange="onNoFlameChange(this)">防炎なし(非防炎生地)
-      </label>
       <label>防炎認証番号</label><input data-f="fire_cert_no" placeholder="BOEN-2026-...">
     `;
     document.getElementById("items").appendChild(div);
@@ -170,10 +170,11 @@
   addItem();
 
   // 「防炎なし」を選んだら認証番号欄は空欄・無効化する
-  function onNoFlameChange(cb){
-    const cert = cb.closest(".item").querySelector('[data-f="fire_cert_no"]');
-    cert.disabled = cb.checked;
-    if(cb.checked) cert.value = "";
+  function onFlameChange(sel){
+    const noFlame = sel.value === "no";
+    const cert = sel.closest(".item").querySelector('[data-f="fire_cert_no"]');
+    cert.disabled = noFlame;
+    if(noFlame) cert.value = "";
   }
 
   // 商品種別で切り替わるもの
@@ -207,9 +208,9 @@
       }
       o[key]=v;
     });
-    // 「防炎なし」チェック時は認証番号の代わりに非防炎の印を入れる(DB列は既存の fire_cert_no のまま)
-    if(o.no_flame) o.fire_cert_no = "非防炎";
-    delete o.no_flame;
+    // 「防炎なし」時は認証番号の代わりに非防炎の印を入れる(DB列は既存の fire_cert_no のまま)
+    if(o.flame === "no") o.fire_cert_no = "非防炎";
+    delete o.flame;
     return o;
   }
   async function submitOrder(){
