@@ -51,6 +51,9 @@ class OrderIn(BaseModel):
     payment_status: str = "paid"
     mall_order_no: Optional[str] = None
     ordered_at: Optional[str] = None
+    # この注文だけ別のラベル版で刷りたい時に指定(DBには保存せず印刷にのみ使う)。
+    # 未指定なら管理画面で選んだ既定の版。
+    label_template: Optional[str] = None
     items: List[ItemIn] = Field(default_factory=list)
 
 

@@ -55,6 +55,34 @@ INV_GROUPS = [(1, "原反"), (2, "マジックテープ"), (3, "ウェビング"
               (4, "アイレット"), (5, "糸"), (6, "カバー")]
 
 
+# ===== ラベルの版(テンプレート) =====
+#
+#   新しいラベルを足す手順:
+#     1. frontend/ に HTML を1枚置く(データの受け取り方は既存の label_gorilla.html と同じ)
+#     2. 下の LABEL_TEMPLATES に1行足す
+#     3. printer_config.json に printer で指定したキーを足す(別の用紙設定で印刷する場合)
+#   ファイルが無い版は管理画面に「未作成」と出て選べないだけで、他に影響しない。
+#
+#   printer  : printer_config.json のキー。無ければ order_printer にフォールバック。
+#   page     : 用紙サイズ(管理画面での案内表示用)
+LABEL_TEMPLATES = {
+    "standard": {
+        "name": "標準(二つ折り)",
+        "file": "label_gorilla.html",
+        "printer": "order_printer",
+        "page": "110 × 449.2mm",
+    },
+    "small": {
+        "name": "小型(縮小版)",
+        "file": "label_small.html",
+        "printer": "order_printer_small",
+        "page": "未定(作成者に確認)",
+    },
+}
+DEFAULT_LABEL_TEMPLATE = "standard"
+LABEL_TEMPLATE_KEY = "label_template"      # settings テーブルのキー
+
+
 # ===== DB ビューア対象テーブル → 主キー列 =====
 DB_TABLES = {
     "orders": "id", "order_items": "id", "scan_events": "id", "shipments": "id",

@@ -514,6 +514,17 @@
             "title": "Items",
             "type": "array"
           },
+          "label_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Template"
+          },
           "mall_order_no": {
             "anyOf": [
               {
@@ -2145,6 +2156,45 @@
         "summary": "Admin Item Stage"
       }
     },
+    "/api/admin/label-templates": {
+      "get": {
+        "description": "ラベルの版の一覧と、現在選ばれている既定の版。\n\nHTML ファイルがまだ無い版は ready=false で返る(選択させない)。\n同僚が小型ラベルを frontend/ に置いた時点で自動的に ready=true になる。",
+        "operationId": "admin_label_templates_api_admin_label_templates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-admin-pass",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "X-Admin-Pass",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Label Templates"
+      }
+    },
     "/api/admin/login": {
       "post": {
         "operationId": "admin_login_api_admin_login_post",
@@ -3430,6 +3480,23 @@
         "summary": "Api Inv Scan"
       }
     },
+    "/api/label-templates": {
+      "get": {
+        "description": "注文入力画面で「この注文だけ別の版」を選ばせるための一覧(認証なし)。\nまだ作られていない版は返さない。",
+        "operationId": "api_label_templates_api_label_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Api Label Templates"
+      }
+    },
     "/api/label/{barcode}": {
       "get": {
         "description": "ラベル(v6) の自動記入用データ。barcode/fabric/size/4辺加工 を DB から返す。",
@@ -3824,7 +3891,20 @@
     },
     "/label": {
       "get": {
+        "description": "ラベルを開く。?tpl=standard / small で版を指定できる。\n指定が無ければ管理画面で選んだ既定の版を使う。\n旧 label.html は使わずバックアップとして残置。",
         "operationId": "page_label_multi_label_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tpl",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tpl",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -3833,6 +3913,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Page Label Multi"
@@ -3848,6 +3938,16 @@
             "required": true,
             "schema": {
               "title": "Barcode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tpl",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Tpl",
               "type": "string"
             }
           }

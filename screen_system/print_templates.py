@@ -92,6 +92,11 @@ def render_order_label(item_data: dict):
     fabric = item_data.get('fabric', 'DP')
     fabric_name = "ダブルレイヤーポリエステル生地" if fabric == "DP" else "ローノイズポリエステル生地" if fabric == "LN" else "スペシャルダブルレイヤーポリエステル生地" if fabric == "SDP" else fabric
 
+    # 仕様表に出す実データ(worker_payload の出力をそのまま使う)
+    _vs = item_data.get('velcro_sides')
+    velcro_txt = f"{_vs}面" if _vs else (item_data.get('magictape') or "なし")
+    skirt_att = item_data.get('skirt_attachment', '') if item_data.get('skirt') == '有り' else ''
+
     perf_dots = "".join(["<i></i>" for _ in range(24)])
     eyelet_dots = "".join(["<i></i>" for _ in range(7)])
 
@@ -113,10 +118,17 @@ def render_order_label(item_data: dict):
         font-family: Arial, Helvetica, "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; overflow: hidden; }}
       .label > * {{ position: absolute; }}
 
+      /* 二つ折り: 224.6mm で折り、下半分(=裏面)を180°回転して印刷する */
+      .backside {{ position: absolute; left: 0; top: 224.6mm; width: 110mm; height: 224.6mm; transform: rotate(180deg); }}
+      .backside > * {{ position: absolute; }}
+      .foldmark {{ top: 224.6mm; width: 5mm; height: 0; border-top: 0.3mm solid #000; }}
+      .foldmark.l {{ left: 0; }}
+      .foldmark.r {{ right: 0; }}
+
       .perf {{ display: flex; justify-content: space-between; align-items: center; }}
       .perf i {{ width: 3.4mm; height: 3.4mm; border-radius: 50%; background: #000; display: block; }}
       .perf.top {{ left: 0.6mm; right: 0.6mm; top: 27.9mm; }}
-      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 412.5mm; }}
+      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 187.9mm; }}
 
       .head {{ left: 8.8mm; top: 44.5mm; }}
       .head .code {{ font-family: Arial, Helvetica, sans-serif; font-weight: 400; font-size: 27.5mm; line-height: 1; letter-spacing: -0.5mm; }}
@@ -135,23 +147,23 @@ def render_order_label(item_data: dict):
       .imgwrap {{ left: 0; right: 0; text-align: center; }}
       .gorilla-w {{ top: 155.6mm; }}
       .gorilla-w img {{ width: 108.4mm; height: auto; display: inline-block; }}
-      .wash-w {{ top: 228.3mm; }}
+      .wash-w {{ top: 3.7mm; }}
       .wash-w img {{ width: 103.5mm; height: auto; display: inline-block; }}
 
-      .qr-w {{ left: 0; right: 0; top: 267.4mm; text-align: center; }}
+      .qr-w {{ left: 0; right: 0; top: 42.8mm; text-align: center; }}
       .qrbox {{ display: inline-block; position: relative; width: 58.2mm; height: 58.2mm; }}
       .qrbox img.qr-img {{ width: 58.2mm; height: 58.2mm; display: block; image-rendering: pixelated; }}
       .qrbox .logo {{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 11mm; height: 11mm; background: #fff; display: flex; align-items: center; justify-content: center; }}
       .qrbox .logo img {{ width: 9mm; height: auto; display: block; }}
 
-      .foot {{ left: 0; right: 0; top: 334.6mm; text-align: center; }}
+      .foot {{ left: 0; right: 0; top: 110.0mm; text-align: center; }}
       .foot .company {{ font-size: 3.4mm; font-weight: 600; line-height: 4.5mm; }}
       .foot .addr {{ font-size: 3.4mm; font-weight: 500; line-height: 4.5mm; }}
-      .design {{ left: 0; right: 0; top: 353.8mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
-      .cdilogo-w {{ top: 362.9mm; }}
+      .design {{ left: 0; right: 0; top: 129.2mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
+      .cdilogo-w {{ top: 138.3mm; }}
       .cdilogo-w img {{ width: 94.5mm; height: auto; display: inline-block; }}
 
-      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 399.8mm; display: flex; justify-content: space-between; }}
+      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 175.2mm; display: flex; justify-content: space-between; }}
       .eyelets i {{ width: 7mm; height: 7mm; border-radius: 50%; border: 0.9mm solid #000; position: relative; display: block; }}
       .eyelets i::after {{ content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 3.2mm; height: 3.2mm; border-radius: 50%; border: 0.7mm solid #000; }}
 
@@ -170,10 +182,10 @@ def render_order_label(item_data: dict):
         <table class="spec">
           <tr><td class="en">Fabric</td><td class="jp">生地</td><td class="v1" colspan="2">{fabric}</td></tr>
           <tr><td class="en">Size</td><td class="jp">サイズ</td><td class="v1" colspan="2">{item_data.get('size', '-')}</td></tr>
-          <tr><td class="en">Top</td><td class="jp">上端</td><td class="v1" colspan="2">{item_data.get('e_top', '-')}</td></tr>
-          <tr><td class="en">Bottom</td><td class="jp">下端</td><td class="v1" colspan="2">{item_data.get('e_bottom', '-')}</td></tr>
-          <tr><td class="en">Left</td><td class="jp">左側</td><td class="v1" colspan="2">{item_data.get('e_left', '-')}</td></tr>
-          <tr><td class="en">Right</td><td class="jp">右側</td><td class="v1" colspan="2">{item_data.get('e_right', '-')}</td></tr>
+          <tr><td class="en">Velcro</td><td class="jp">ベルクロ</td><td class="v1">{velcro_txt}</td><td class="v2">{item_data.get('velcro_type', '')}</td></tr>
+          <tr><td class="en">Skirt</td><td class="jp">スカート</td><td class="v1">{item_data.get('skirt', '-')}</td><td class="v2">{skirt_att}</td></tr>
+          <tr><td class="en">Eyelet</td><td class="jp">上/下</td><td class="v1">{item_data.get('e_top', '-')}</td><td class="v2">{item_data.get('e_bottom', '-')}</td></tr>
+          <tr><td class="en"></td><td class="jp">左/右</td><td class="v1">{item_data.get('e_left', '-')}</td><td class="v2">{item_data.get('e_right', '-')}</td></tr>
         </table>
 
         <div class="barcode-wrap">
@@ -182,6 +194,12 @@ def render_order_label(item_data: dict):
         </div>
 
         <div class="imgwrap gorilla-w"><img src="data:image/png;base64,{logo_b64}" alt="ゴリラインパクト スクリーン"></div>
+
+        <div class="foldmark l"></div>
+        <div class="foldmark r"></div>
+
+        <!-- ここから裏面(下半分)。折って裏返した時に正しく読めるよう180°回転される -->
+        <div class="backside">
         <div class="imgwrap wash-w"><img src="data:image/png;base64,{wash_b64}" alt="洗濯表示"></div>
 
         <div class="qr-w">
@@ -203,6 +221,7 @@ def render_order_label(item_data: dict):
         <div class="eyelets">{eyelet_dots}</div>
         <div class="perf bottom">{perf_dots}</div>
         <div class="blackbar"></div>
+        </div><!-- /backside -->
       </div>
     </body>
     </html>

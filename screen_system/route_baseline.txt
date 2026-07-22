@@ -24,6 +24,7 @@ GET     /api/admin/inventory/history
 GET     /api/admin/inventory/history.csv
 POST    /api/admin/inventory/reorder
 PATCH   /api/admin/items/{barcode}/stage
+GET     /api/admin/label-templates
 POST    /api/admin/login
 GET     /api/admin/orders
 GET     /api/admin/orders/{order_no}
@@ -51,6 +52,7 @@ GET     /api/events
 GET     /api/inventory
 GET     /api/inventory/label/{serial}
 POST    /api/inventory/scan
+GET     /api/label-templates
 GET     /api/label/{barcode}
 GET     /api/monitor/{proc}
 POST    /api/monitor/{proc}/scan

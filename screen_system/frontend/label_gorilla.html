@@ -39,6 +39,49 @@
       position: absolute;
     }
 
+    /* ===== 二つ折り =====
+       全長 449.2mm を 224.6mm で半分に折る。
+       上半分 = 表面 / 下半分 = 裏面。折って裏返すと下半分は上下逆さまに見えるため、
+       下半分をまとめて 180° 回転させて印刷する(=折った状態で正しく読める)。 */
+    .backside {
+      position: absolute;
+      left: 0;
+      top: 224.6mm;
+      width: 110mm;
+      height: 224.6mm;
+      transform: rotate(180deg);
+    }
+
+    .backside>* {
+      position: absolute;
+    }
+
+    /* 折り位置の目印(端の短い線だけ。中央は印字しない) */
+    .foldmark {
+      top: 224.6mm;
+      width: 5mm;
+      height: 0;
+      border-top: 0.3mm solid #000;
+    }
+
+    .foldmark.l { left: 0; }
+    .foldmark.r { right: 0; }
+
+    /* 画面で確認する時だけ折り線を薄く見せる(印刷には出ない) */
+    @media screen {
+      .foldguide {
+        left: 0;
+        right: 0;
+        top: 224.6mm;
+        height: 0;
+        border-top: 0.2mm dashed #9bb;
+      }
+    }
+
+    @media print {
+      .foldguide { display: none; }
+    }
+
     @media screen {
       body {
         background: #e9edf2;
@@ -81,7 +124,7 @@
     }
 
     .perf.bottom {
-      top: 412.5mm;
+      top: 187.9mm;
     }
 
     /* header LN + product name */
@@ -176,7 +219,7 @@
     .washcare {
       left: 50%;
       transform: translateX(-50%);
-      top: 228.3mm;
+      top: 3.7mm;
       width: 103.5mm;
       height: auto;
       display: block;
@@ -186,7 +229,7 @@
     .qrbox {
       left: 50%;
       transform: translateX(-50%);
-      top: 267.4mm;
+      top: 42.8mm;
       width: 58.2mm;
       height: 58.2mm;
     }
@@ -221,7 +264,7 @@
     .foot {
       left: 0;
       right: 0;
-      top: 334.6mm;
+      top: 110.0mm;
       text-align: center;
     }
 
@@ -241,7 +284,7 @@
     .design {
       left: 0;
       right: 0;
-      top: 353.8mm;
+      top: 129.2mm;
       text-align: center;
       font-size: 3.1mm;
       font-weight: 500;
@@ -252,7 +295,7 @@
     .cdilogo {
       left: 50%;
       transform: translateX(-50%);
-      top: 362.9mm;
+      top: 138.3mm;
       width: 94.5mm;
       height: auto;
       display: block;
@@ -262,7 +305,7 @@
     .eyelets {
       left: 0.2mm;
       right: 0.2mm;
-      top: 399.8mm;
+      top: 175.2mm;
       display: flex;
       justify-content: space-between;
     }
@@ -320,25 +363,33 @@
 
       <img class="gorilla" id="gorilla" alt="ゴリラインパクト スクリーン">
 
-      <img class="washcare" id="washcare" alt="洗濯表示">
+      <!-- 折り位置(224.6mm)の目印 -->
+      <div class="foldmark l"></div>
+      <div class="foldmark r"></div>
+      <div class="foldguide"></div>
 
-      <div class="qrbox">
-        <img class="qr" id="qrimg" alt="QR">
-        <div class="qrmark"><img id="qrmark" alt="CDI"></div>
+      <!-- ===== ここから裏面(下半分)。180°回転して印刷される ===== -->
+      <div class="backside">
+        <img class="washcare" id="washcare" alt="洗濯表示">
+
+        <div class="qrbox">
+          <img class="qr" id="qrimg" alt="QR">
+          <div class="qrmark"><img id="qrmark" alt="CDI"></div>
+        </div>
+
+        <div class="foot">
+          <div class="company" id="cCompany">株式会社シーディアイ</div>
+          <div class="addr" id="cAddr1">〒491-0922　愛知県一宮市大和町妙興寺字丹波12番</div>
+          <div class="addr" id="cAddr2">Tel　0586-27-0123　　　https://www.cdi.jpn.com/</div>
+        </div>
+
+        <div class="design" id="cDesign">Design and Quality CDI of JAPAN</div>
+        <img class="cdilogo" id="cdilogo" alt="株式会社シーディアイ">
+
+        <div class="eyelets" id="eyelets"></div>
+        <div class="perf bottom" id="perfBottom"></div>
+        <div class="blackbar"></div>
       </div>
-
-      <div class="foot">
-        <div class="company" id="cCompany">株式会社シーディアイ</div>
-        <div class="addr" id="cAddr1">〒491-0922　愛知県一宮市大和町妙興寺字丹波12番</div>
-        <div class="addr" id="cAddr2">Tel　0586-27-0123　　　https://www.cdi.jpn.com/</div>
-      </div>
-
-      <div class="design" id="cDesign">Design and Quality CDI of JAPAN</div>
-      <img class="cdilogo" id="cdilogo" alt="株式会社シーディアイ">
-
-      <div class="eyelets" id="eyelets"></div>
-      <div class="perf bottom" id="perfBottom"></div>
-      <div class="blackbar"></div>
     </div>
   </div>
   <script>/*! JsBarcode v3.11.6 | (c) Johan Lindell | MIT license */
@@ -2660,19 +2711,35 @@
       SDP: "スペシャルダブルレイヤーポリエステル生地"
     };
 
-    /* PSD固定行(現DBに対応項目なし → テンプレート値のまま表示) */
-    const PSD_ROWS = [
-      ["layer",  "層",       "Back", "Front"],
-      ["Velcro", "ベルクロ", "オス", "しせい"],
-      ["Skirt",  "スカート", "あり", "なし"],
-      ["Eyelet", "アイレット","P 300","C 100"]
-    ];
+    /* 仕様表の行を /api/label のレスポンスから組み立てる。
+       以前はここに固定値が書かれており、注文内容に関わらず同じ値が印字されていた。 */
+    function procText(x) {
+      if (!x) return "なし";
+      if (x.type === "eyelet") return ("P" + (x.spacing || "")).trim() + (x.skirt ? "＋スカート" : "");
+      if (x.type === "skirt" || x.skirt) return "スカート";
+      if (x.type === "velcro") return "ベルクロ";
+      return "なし";
+    }
+
+    function specRows(a) {
+      const p = a.processing || {};
+      return [
+        ["Fabric", "生地",     a.fabric || "",                       ""],
+        ["Size",   "サイズ",   sizeText(a),                          ""],
+        ["Velcro", "ベルクロ", a.velcroSides ? a.velcroSides + "面" : "なし", a.velcroType || ""],
+        ["Skirt",  "スカート", a.hasSkirt ? "あり" : "なし",          a.skirtAttachment || ""],
+        ["Eyelet", "上/下",    procText(p.top),                      procText(p.bottom)],
+        ["",       "左/右",    procText(p.left),                     procText(p.right)]
+      ];
+    }
 
     /* データが無い時のサンプル */
     const SAMPLE = {
       code: "LN",
       name: "特殊ダブルレイヤーポリエステル生地",
-      spec: [["Fabric","生地","LN",""],["Size","サイズ","W:2800×H:3000",""], ...PSD_ROWS],
+      spec: [["Fabric","生地","LN",""], ["Size","サイズ","W:2800×H:3000",""],
+             ["Velcro","ベルクロ","3面","オス"], ["Skirt","スカート","あり","縫い付け"],
+             ["Eyelet","上/下","P300","P300＋スカート"], ["","左/右","P300","P300"]],
       barcodeValue: "CDI260717001SDP01",
       barcodeText: "CDI260717001SDP",
       qrValue: "https://cdigolf.base.ec/",
@@ -2692,7 +2759,7 @@
       return {
         code: fabric,
         name: FABRIC_NAMES[fabric] || a.fabricNameJp || "",
-        spec: [["Fabric","生地",fabric,""], ["Size","サイズ",sizeText(a),""], ...PSD_ROWS],
+        spec: specRows(a),
         barcodeValue: bc,
         barcodeText: a.barcodeText || bc,
         qrValue: a.qrValue || "https://cdigolf.base.ec/",

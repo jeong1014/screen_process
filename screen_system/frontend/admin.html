@@ -81,7 +81,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TABS=[["orders","注文"],["inv","在庫"],["po_req","発注依頼"],["po_sched","発注予定"],["ship","出荷"],["history","履歴"],["screens","画面"]];
+const TABS=[["orders","注文"],["inv","在庫"],["po_req","発注依頼"],["po_sched","発注予定"],["ship","出荷"],["history","履歴"],["label","ラベル"],["screens","画面"]];
 const PO_ST_CLS={requested:"warn",ordered:"pri",arrived:"ok",cancelled:"cancelled"};
 const SHIP_JA={ready:"出荷準備完了",label_printed:"送り状発行済",handed_to_sagawa:"佐川引渡し済",completed:"出荷完了"};
 const BIZ_JA={not_requested:"未連携",requested:"連携依頼中",issued:"発行済",failed:"失敗"};
@@ -163,6 +163,49 @@ function shippingSlipPreview(){
     </div>
   </body></html>`);
   w.document.close(); w.focus();
+}
+
+// ===== ラベルの版(標準 / 小型)を選ぶ =====
+RENDER.label=async ()=>{
+  const M=document.getElementById("main");
+  M.innerHTML=`<div class="panel"><h2>ラベルの版</h2>
+    <div class="muted" style="margin:-4px 0 12px;font-size:12px">
+      ここで選んだ版が、注文入力の保存時に自動で印刷されます。
+      注文入力画面で「この注文だけ別の版」を選ぶこともできます。</div>
+    <div id="lblBody" class="muted">読み込み中...</div></div>`;
+  try{
+    const d=await api("/api/admin/label-templates");
+    document.getElementById("lblBody").innerHTML=`<table>
+      <tr><th></th><th>版</th><th>用紙</th><th>プリンタ設定キー</th><th>状態</th></tr>
+      ${d.templates.map(t=>`<tr>
+        <td style="width:34px">${t.ready
+            ? `<input type="radio" name="lbltpl" value="${esc(t.key)}" ${t.key===d.current?"checked":""} style="width:auto">`
+            : ""}</td>
+        <td><b>${esc(t.name)}</b><div class="muted" style="font-size:11px;font-family:Consolas,monospace">${esc(t.file)}</div></td>
+        <td>${esc(t.page||"—")}</td>
+        <td style="font-family:Consolas,monospace;font-size:12px">${esc(t.printer)}</td>
+        <td>${t.ready?`<span class="pill">利用可</span>`
+                     :`<span class="pill" style="color:var(--danger)">未作成</span>`}</td>
+      </tr>`).join("")}</table>
+      <div style="margin-top:14px"><button class="b b-pri" onclick="saveLabelTpl()">この版を既定にする</button></div>
+      <div class="muted" style="margin-top:16px;font-size:12px;line-height:1.7">
+        <b>新しい版を追加するには</b><br>
+        ① 作った HTML を <code>frontend/</code> に置く(ファイル名は上の表のとおり)<br>
+        ② サーバーを再起動すると「未作成」が「利用可」に変わります<br>
+        ③ 用紙の長さが違う場合は、Windows で同じプリンタをもう一度追加して別名で登録し、
+           その名前を <code>printer_config.json</code> の上記キーに書きます<br>
+        詳しくは <code>docs/ラベル版の追加方法.md</code> を見てください。
+      </div>`;
+  }catch(e){ document.getElementById("lblBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+};
+async function saveLabelTpl(){
+  const sel=document.querySelector('input[name="lbltpl"]:checked');
+  if(!sel){ alert("版を選んでください"); return; }
+  try{
+    await api("/api/admin/settings",{method:"POST",
+      body:JSON.stringify({values:{label_template:sel.value}})});
+    toast("既定の版を保存しました"); RENDER.label();
+  }catch(e){ alert(e.message); }
 }
 
 // ===== 画面ランチャー(作業者/モニター等を別タブで開く) =====

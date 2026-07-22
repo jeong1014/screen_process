@@ -4,11 +4,27 @@
 
 from fastapi import APIRouter, Depends
 
-from db import db
+from config import LABEL_TEMPLATE_KEY
+from db import db, _get_setting
 from schemas import SettingsIn
 from security import require_admin
+from services.labels import listing as label_template_listing, resolve as resolve_label
 
 router = APIRouter()
+
+
+@router.get("/api/admin/label-templates")
+def admin_label_templates(_=Depends(require_admin)):
+    """ラベルの版の一覧と、現在選ばれている既定の版。
+
+    HTML ファイルがまだ無い版は ready=false で返る(選択させない)。
+    同僚が小型ラベルを frontend/ に置いた時点で自動的に ready=true になる。
+    """
+    with db() as conn, conn.cursor() as cur:
+        saved = _get_setting(cur, LABEL_TEMPLATE_KEY, "")
+    return {"templates": label_template_listing(),
+            "saved": saved,          # settings に入っている生の値
+            "current": resolve_label()}   # 実際に使われる版
 
 
 @router.get("/api/admin/settings")

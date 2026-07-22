@@ -7,6 +7,7 @@ import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
+from services.labels import resolve_path as resolve_label_path
 from config import (
     FRONTEND_DIR, MON_PROC,
 )
@@ -57,15 +58,16 @@ def page_shipping_slip(barcode: str):
 #   (2枚セットの表面/裏面を同時に印刷する時など。在庫QRラベルと同じ方式)
 # =============================================================================
 @router.get("/label")
-def page_label_multi():
-    # 本番ラベル = label_gorilla.html(ゴリラインパクトデザイン)。
-    # 旧 label.html は使わずバックアップとして残置。
-    return FileResponse(os.path.join(FRONTEND_DIR, "label_gorilla.html"))
+def page_label_multi(tpl: str = ""):
+    """ラベルを開く。?tpl=standard / small で版を指定できる。
+       指定が無ければ管理画面で選んだ既定の版を使う。
+       旧 label.html は使わずバックアップとして残置。"""
+    return FileResponse(resolve_label_path(tpl))
 
 
 @router.get("/label/{barcode}")
-def page_label(barcode: str):
-    return FileResponse(os.path.join(FRONTEND_DIR, "label_gorilla.html"))
+def page_label(barcode: str, tpl: str = ""):
+    return FileResponse(resolve_label_path(tpl))
 
 
 @router.get("/admin")

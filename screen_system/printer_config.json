@@ -1,5 +1,6 @@
 {
     "inventory_printer": "Brother QL-820NWB",
     "order_printer": "Xprinter XP-TT426B",
+    "order_printer_small": "",
     "invoice_printer": "MFC-J7100CDW Printer"
 }

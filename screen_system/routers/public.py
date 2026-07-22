@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 
 from config import (
     MAX_STAGE, PROC_BY_STAGE, SHEET_SIDE_JA, _PRODUCT_JP, MON_PROC,
+    VELCRO_JA, SKIRT_ATTACH_JA,
 )
 from db import db
 from schemas import (
@@ -24,6 +25,10 @@ from services.stage import (
     next_order_no, _fetch_item, get_item_payload, move_stage, monitor_scan,
 )
 from services.inventory import inv_scan
+from services.labels import (
+    printer_key as label_printer_key, resolve as resolve_label,
+    listing as label_template_listing,
+)
 
 router = APIRouter()
 
@@ -47,10 +52,21 @@ def api_shipping_slip(barcode: str):
             "channel": o["channel"], "payment_status": o["payment_status"], "items": items}
 
 
+@router.get("/api/label-templates")
+def api_label_templates():
+    """注文入力画面で「この注文だけ別の版」を選ばせるための一覧(認証なし)。
+       まだ作られていない版は返さない。"""
+    return {"templates": [t for t in label_template_listing() if t["ready"]],
+            "current": resolve_label()}
+
+
 @router.post("/api/orders")
 def create_order(order: OrderIn):
     if not order.items:
         raise HTTPException(400, "明細(items)が最低1件必要です。")
+    # この注文に使うラベル版(指定が無ければ管理画面の既定)
+    label_tpl = resolve_label(order.label_template)
+    label_printer = label_printer_key(label_tpl)
     with db() as conn, conn.cursor() as cur:
         order_no = next_order_no(cur)
         cur.execute(
@@ -127,12 +143,12 @@ def create_order(order: OrderIn):
                 # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
                 item_data = worker_payload(item_row)
                 html_content = render_order_label(item_data)
-                silent_print_html(html_content, "order_printer")
+                silent_print_html(html_content, label_printer)
             except Exception as e:
                 import traceback
                 print(f"⚠️ ラベル印刷に失敗(注文は登録済み) barcode={barcode}: {e}")
                 traceback.print_exc()
-    return {"order_no": order_no, "barcodes": created}
+    return {"order_no": order_no, "barcodes": created, "label_template": label_tpl}
 
 
 @router.get("/api/orders/{order_no}")
@@ -252,7 +268,12 @@ def api_label(barcode: str):
             "left": _proc(*s["left"]),
             "right": _proc(*s["right"]),
         },
+        # ラベルの仕様表に出す実データ(以前はテンプレートに固定値が埋まっていた)
         "velcroSides": row.get("velcro_sides"),
+        "velcroType": VELCRO_JA.get(row.get("velcro_type"), ""),
+        "hasSkirt": bool(row.get("has_skirt")),
+        "skirtAttachment": (SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "")
+                            if row.get("has_skirt") else ""),
         "bohenNumber": row["fire_cert_no"] or "",
         "qrValue": "https://cdigolf.base.ec/",
     }
