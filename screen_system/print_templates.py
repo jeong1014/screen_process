@@ -128,10 +128,11 @@ def render_order_label(item_data: dict):
       .perf {{ display: flex; justify-content: space-between; align-items: center; }}
       .perf i {{ width: 3.4mm; height: 3.4mm; border-radius: 50%; background: #000; display: block; }}
       .perf.top {{ left: 0.6mm; right: 0.6mm; top: 27.9mm; }}
-      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 187.9mm; }}
+      .perf.bottom {{ left: 0.6mm; right: 0.6mm; top: 441.0mm; }}
 
       .head {{ left: 8.8mm; top: 44.5mm; }}
-      .head .code {{ font-family: Arial, Helvetica, sans-serif; font-weight: 400; font-size: 27.5mm; line-height: 1; letter-spacing: -0.5mm; }}
+      .head .code {{ font-family: Arial, Helvetica, sans-serif; font-weight: 800; font-size: 27.5mm; line-height: 1;
+        letter-spacing: -1.8mm; transform: scaleX(0.82); transform-origin: left center; }}
       .head .name {{ font-size: 4.8mm; font-weight: 500; letter-spacing: -0.1mm; margin-top: -2.4mm; white-space: nowrap; }}
 
       table.spec {{ left: 8.8mm; top: 85.6mm; border-collapse: collapse; }}
@@ -147,27 +148,26 @@ def render_order_label(item_data: dict):
       .imgwrap {{ left: 0; right: 0; text-align: center; }}
       .gorilla-w {{ top: 155.6mm; }}
       .gorilla-w img {{ width: 108.4mm; height: auto; display: inline-block; }}
-      .wash-w {{ top: 3.7mm; }}
+      .wash-w {{ top: 73.1mm; }}
       .wash-w img {{ width: 103.5mm; height: auto; display: inline-block; }}
 
-      .qr-w {{ left: 0; right: 0; top: 42.8mm; text-align: center; }}
+      .qr-w {{ left: 0; right: 0; top: 112.2mm; text-align: center; }}
       .qrbox {{ display: inline-block; position: relative; width: 58.2mm; height: 58.2mm; }}
       .qrbox img.qr-img {{ width: 58.2mm; height: 58.2mm; display: block; image-rendering: pixelated; }}
       .qrbox .logo {{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 11mm; height: 11mm; background: #fff; display: flex; align-items: center; justify-content: center; }}
       .qrbox .logo img {{ width: 9mm; height: auto; display: block; }}
 
-      .foot {{ left: 0; right: 0; top: 110.0mm; text-align: center; }}
+      .foot {{ left: 0; right: 0; top: 179.4mm; text-align: center; }}
       .foot .company {{ font-size: 3.4mm; font-weight: 600; line-height: 4.5mm; }}
       .foot .addr {{ font-size: 3.4mm; font-weight: 500; line-height: 4.5mm; }}
-      .design {{ left: 0; right: 0; top: 129.2mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
-      .cdilogo-w {{ top: 138.3mm; }}
+      .design {{ left: 0; right: 0; top: 198.6mm; text-align: center; font-size: 3.1mm; font-weight: 500; color: #7d7d7d; letter-spacing: 0.2mm; }}
+      .cdilogo-w {{ top: 207.7mm; }}
       .cdilogo-w img {{ width: 94.5mm; height: auto; display: inline-block; }}
 
-      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 175.2mm; display: flex; justify-content: space-between; }}
+      .eyelets {{ left: 0.2mm; right: 0.2mm; top: 429.0mm; display: flex; justify-content: space-between; }}
       .eyelets i {{ width: 7mm; height: 7mm; border-radius: 50%; border: 0.9mm solid #000; position: relative; display: block; }}
       .eyelets i::after {{ content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 3.2mm; height: 3.2mm; border-radius: 50%; border: 0.7mm solid #000; }}
 
-      .blackbar {{ left: 0; right: 0; bottom: 0; height: 19mm; background: #000; }}
     </style>
     </head>
     <body>
@@ -218,10 +218,11 @@ def render_order_label(item_data: dict):
         <div class="design">Design and Quality CDI of JAPAN</div>
         <div class="imgwrap cdilogo-w"><img src="data:image/png;base64,{cdilogo_b64}" alt="株式会社シーディアイ"></div>
 
+        </div><!-- /backside -->
+
+        <!-- 点線は回転させず、用紙のいちばん下に置く -->
         <div class="eyelets">{eyelet_dots}</div>
         <div class="perf bottom">{perf_dots}</div>
-        <div class="blackbar"></div>
-        </div><!-- /backside -->
       </div>
     </body>
     </html>

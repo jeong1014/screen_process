@@ -124,7 +124,7 @@
     }
 
     .perf.bottom {
-      top: 187.9mm;
+      top: 441.0mm;
     }
 
     /* header LN + product name */
@@ -135,10 +135,12 @@
 
     .head .code {
       font-family: Arial, Helvetica, sans-serif;
-      font-weight: 400;
+      font-weight: 800;          /* 線を太く */
       font-size: 27.5mm;
       line-height: 1;
-      letter-spacing: -0.5mm;
+      letter-spacing: -1.8mm;    /* 文字の間の空きを詰める */
+      transform: scaleX(0.82);   /* 字幅を細くする(LN/DP/SDP 共通) */
+      transform-origin: left center;
     }
 
     .head .name {
@@ -219,7 +221,7 @@
     .washcare {
       left: 50%;
       transform: translateX(-50%);
-      top: 3.7mm;
+      top: 73.1mm;
       width: 103.5mm;
       height: auto;
       display: block;
@@ -229,7 +231,7 @@
     .qrbox {
       left: 50%;
       transform: translateX(-50%);
-      top: 42.8mm;
+      top: 112.2mm;
       width: 58.2mm;
       height: 58.2mm;
     }
@@ -264,7 +266,7 @@
     .foot {
       left: 0;
       right: 0;
-      top: 110.0mm;
+      top: 179.4mm;
       text-align: center;
     }
 
@@ -284,7 +286,7 @@
     .design {
       left: 0;
       right: 0;
-      top: 129.2mm;
+      top: 198.6mm;
       text-align: center;
       font-size: 3.1mm;
       font-weight: 500;
@@ -295,7 +297,7 @@
     .cdilogo {
       left: 50%;
       transform: translateX(-50%);
-      top: 138.3mm;
+      top: 207.7mm;
       width: 94.5mm;
       height: auto;
       display: block;
@@ -305,7 +307,7 @@
     .eyelets {
       left: 0.2mm;
       right: 0.2mm;
-      top: 175.2mm;
+      top: 429.0mm;
       display: flex;
       justify-content: space-between;
     }
@@ -331,14 +333,6 @@
       border: 0.7mm solid #000;
     }
 
-    /* bottom black bar */
-    .blackbar {
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 19mm;
-      background: #000;
-    }
   </style>
 </head>
 
@@ -386,10 +380,11 @@
         <div class="design" id="cDesign">Design and Quality CDI of JAPAN</div>
         <img class="cdilogo" id="cdilogo" alt="株式会社シーディアイ">
 
-        <div class="eyelets" id="eyelets"></div>
-        <div class="perf bottom" id="perfBottom"></div>
-        <div class="blackbar"></div>
       </div>
+
+      <!-- 点線(ミシン目・アイレット)は回転させず、用紙のいちばん下に置く -->
+      <div class="eyelets" id="eyelets"></div>
+      <div class="perf bottom" id="perfBottom"></div>
     </div>
   </div>
   <script>/*! JsBarcode v3.11.6 | (c) Johan Lindell | MIT license */
