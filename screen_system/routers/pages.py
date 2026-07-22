@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from services.labels import resolve_path as resolve_label_path
 from config import (
-    FRONTEND_DIR, MON_PROC,
+    BASE_DIR, FRONTEND_DIR, MON_PROC,
 )
 
 router = APIRouter()
@@ -42,8 +42,13 @@ def page_dashboard():
 def page_shop():
     # 販売サイトの商品ページ(detail_sizeGuide_v26.html)を同一オリジンで配信。
     # ここから「注文を確定」すると POST /api/orders でDBに登録される。
-    base = os.path.dirname(os.path.abspath(__file__))
-    return FileResponse(os.path.join(base, "detail_sizeGuide_v26.html"))
+    #
+    # 注意: このファイルは screen_system/ 直下にある。__file__ を使うと
+    #       routers/ を指してしまうので、必ず config.BASE_DIR を使うこと。
+    path = os.path.join(BASE_DIR, "detail_sizeGuide_v26.html")
+    if not os.path.exists(path):
+        raise HTTPException(404, f"商品ページが見つかりません: {path}")
+    return FileResponse(path)
 
 
 @router.get("/shipping-slip/{barcode}")

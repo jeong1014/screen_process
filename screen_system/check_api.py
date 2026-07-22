@@ -9,9 +9,11 @@ DB나 프린터 없이 앱 모듈만 import 해서 검사한다.
     diff openapi_before.json openapi_after.json          # 아무것도 안 나와야 성공
 
     python check_api.py verify main                      # 라우트 목록/순서 검사
+    python check_api.py pages  main                      # 화면을 실제로 열어보는 스모크
 """
 import importlib
 import json
+import os
 import sys
 import types
 
@@ -89,11 +91,66 @@ def verify(target, baseline="route_baseline.txt"):
     sys.exit(0 if ok else 1)
 
 
+def pages(target="main"):
+    """HTML 화면 라우트를 실제로 열어본다 (DB 없이 가능한 것만).
+
+    파일 경로가 틀려서 500 이 나는 종류의 사고를 잡기 위한 검사.
+    openapi diff 나 pyflakes 로는 절대 안 걸린다.
+    """
+    try:
+        from fastapi.testclient import TestClient
+    except Exception as e:
+        print(f"⚠️ TestClient 를 못 씁니다({e}). `pip install httpx` 후 다시 실행하세요.")
+        return
+
+    app = _load(target).app
+    # 경로 파라미터가 있는 것은 DB 를 타므로 제외. 정적 파일만 내려주는 화면이 대상.
+    targets = ["/", "/input", "/worker", "/dashboard", "/shop", "/admin", "/invscan",
+               "/label", "/monitor/cutting", "/monitor/sewing", "/monitor/eyelet"]
+
+    ok = True
+    with TestClient(app, raise_server_exceptions=False) as c:
+        for path in targets:
+            try:
+                r = c.get(path, follow_redirects=True)
+                good = r.status_code < 400
+                ok &= good
+                print(f"  {'✅' if good else '❌'} {r.status_code} {path}")
+            except Exception as e:
+                ok = False
+                print(f"  ❌ EXC {path} — {type(e).__name__}: {e}")
+
+    # 화면이 참조하는 정적 파일이 실제로 있는지도 같이 본다
+    import re as _re
+    from config import FRONTEND_DIR, BASE_DIR
+    missing = []
+    for d in (FRONTEND_DIR, BASE_DIR):
+        for fn in os.listdir(d) if os.path.isdir(d) else []:
+            if not fn.endswith(".html"):
+                continue
+            html = open(os.path.join(d, fn), encoding="utf-8", errors="ignore").read()
+            for ref in set(_re.findall(r'/static/[^"\')\s]+', html)):
+                p = os.path.join(FRONTEND_DIR, ref[len("/static/"):])
+                if not os.path.exists(p):
+                    missing.append(f"{fn} → {ref}")
+    if missing:
+        ok = False
+        print("\n❌ 화면이 찾는데 없는 정적 파일:")
+        for m in sorted(set(missing)):
+            print("   ", m)
+    else:
+        print("\n✅ 화면이 참조하는 /static 파일 전부 존재")
+
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "dump"
     tgt = sys.argv[2] if len(sys.argv) > 2 else "main"
     if cmd == "verify":
         verify(tgt)
+    elif cmd == "pages":
+        pages(tgt)
     elif cmd == "dump":
         dump(tgt)
     else:                      # 이전 사용법 호환: check_api.py <module>
