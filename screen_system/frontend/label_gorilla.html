@@ -7,7 +7,7 @@
   <title>スクリーン生地ラベル (ゴリラインパクト)</title>
   <style>
     @page {
-      size: 110mm 410mm;
+      size: 110mm 412mm;
       margin: 0;
     }
 
@@ -27,7 +27,7 @@
     .label {
       position: relative;
       width: 110mm;
-      height: 410mm;
+      height: 412mm;
       margin: 0 auto;
       background: #fff;
       color: #000;
@@ -40,16 +40,17 @@
     }
 
     /* ===== 二つ折り =====
-       全長 410mm を 226mm で折る。折り目の前後に約10mmずつ余白。
+       全長 412mm を 206mm で折る。折り目の前後に約10mmずつ余白。
+       表面 206mm / 裏面 206mm で長さが揃うため、折ると端がぴったり合う。
        上半分 = 表面 / 下半分 = 裏面。折って裏返すと下半分は上下逆さまに見えるため、
        下半分をまとめて 180° 回転させて印刷する(=折った状態で正しく読める)。
-       裏面は表面より短い(184mm)。用紙を短くするため意図的にそうしている。 */
+       */
     .backside {
       position: absolute;
       left: 0;
-      top: 226mm;
+      top: 206mm;
       width: 110mm;
-      height: 184mm;
+      height: 206mm;
       transform: rotate(180deg);
     }
 
@@ -59,7 +60,7 @@
 
     /* 折り位置の目印(端の短い線だけ。中央は印字しない) */
     .foldmark {
-      top: 226mm;
+      top: 206mm;
       width: 5mm;
       height: 0;
       border-top: 0.3mm solid #000;
@@ -73,7 +74,7 @@
       .foldguide {
         left: 0;
         right: 0;
-        top: 226mm;
+        top: 206mm;
         height: 0;
         border-top: 0.2mm dashed #9bb;
       }
@@ -121,17 +122,17 @@
     }
 
     .perf.top {
-      top: 27.9mm;
+      top: 15.0mm;
     }
 
     .perf.bottom {
-      top: 404.5mm;
+      top: 393.6mm;
     }
 
     /* header LN + product name */
     .head {
       left: 8.8mm;
-      top: 44.5mm;
+      top: 24.4mm;
     }
 
     .head .code {
@@ -154,7 +155,7 @@
     /* spec table */
     table.spec {
       left: 8.8mm;
-      top: 85.6mm;
+      top: 65.5mm;
       border-collapse: collapse;
     }
 
@@ -189,7 +190,7 @@
     .barcode-wrap {
       left: 0;
       right: 0;
-      top: 124.5mm;
+      top: 104.4mm;
       text-align: center;
     }
 
@@ -211,7 +212,7 @@
     .gorilla {
       left: 50%;
       transform: translateX(-50%);
-      top: 155.6mm;
+      top: 135.5mm;
       width: 108.4mm;
       max-width: none;
       height: auto;
@@ -222,7 +223,7 @@
     .washcare {
       left: 50%;
       transform: translateX(-50%);
-      top: 22.5mm;
+      top: 44.5mm;
       width: 103.5mm;
       height: auto;
       display: block;
@@ -232,7 +233,7 @@
     .qrbox {
       left: 50%;
       transform: translateX(-50%);
-      top: 61.6mm;
+      top: 83.6mm;
       width: 58.2mm;
       height: 58.2mm;
     }
@@ -267,7 +268,7 @@
     .foot {
       left: 0;
       right: 0;
-      top: 128.8mm;
+      top: 150.8mm;
       text-align: center;
     }
 
@@ -287,7 +288,7 @@
     .design {
       left: 0;
       right: 0;
-      top: 148.0mm;
+      top: 170.0mm;
       text-align: center;
       font-size: 3.1mm;
       font-weight: 500;
@@ -298,7 +299,7 @@
     .cdilogo {
       left: 50%;
       transform: translateX(-50%);
-      top: 157.1mm;
+      top: 179.1mm;
       width: 94.5mm;
       height: auto;
       display: block;
@@ -308,7 +309,7 @@
     .eyelets {
       left: 0.2mm;
       right: 0.2mm;
-      top: 392.5mm;
+      top: 381.6mm;
       display: flex;
       justify-content: space-between;
     }

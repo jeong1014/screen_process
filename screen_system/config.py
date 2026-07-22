@@ -70,7 +70,7 @@ LABEL_TEMPLATES = {
         "name": "標準(二つ折り)",
         "file": "label_gorilla.html",
         "printer": "order_printer",
-        "page": "110 × 410mm(二つ折り)",
+        "page": "110 × 412mm(二つ折り)",
     },
     "small": {
         "name": "小型(縮小版)",
