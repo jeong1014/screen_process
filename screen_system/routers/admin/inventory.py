@@ -240,7 +240,7 @@ def admin_inv_history_delete(tx_id: int, _=Depends(require_admin)):
 
 @router.post("/api/admin/inv/item")
 def admin_inv_item_create(body: InvItemIn, _=Depends(require_admin)):
-    unit = body.unit or ("ロール" if body.category == "fabric" else "箱")
+    unit = body.unit or {"fabric": "ロール", "supply": "本"}.get(body.category, "箱")
     so = int(body.code) if body.code.isdigit() else 999
     with db() as conn, conn.cursor() as cur:
         try:

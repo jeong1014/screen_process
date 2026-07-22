@@ -35,7 +35,7 @@
   .pill{font-size:11px;padding:2px 9px;border-radius:20px;background:#eef2f7;border:1px solid var(--line);font-weight:700;}
   .pill.cancelled{background:var(--danger-bg);color:var(--danger);border-color:var(--danger);}
   .fb{font-weight:900;padding:2px 12px;border-radius:8px;color:#fff;font-size:13px;}
-  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);} .fb.ACC{background:var(--sub);}
+  .fb.LN{background:var(--ln);} .fb.DP{background:var(--dp);} .fb.SDP{background:var(--sdp);} .fb.ACC{background:var(--sub);} .fb.SUP{background:#4a5f8a;}
   button.b{border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;}
   .b-pri{background:var(--accent);color:#fff;} .b-ok{background:var(--ok);color:#fff;}
   .b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn)!important;}
@@ -376,7 +376,7 @@ RENDER.inv=async ()=>{
     <div class="panel"><h2>品目を追加</h2>
       <div class="row">
         <div><label class="f">コード</label><input id="niCode" placeholder="62 等" style="width:70px"></div>
-        <div><label class="f">区分</label><select id="niCat"><option value="accessory">付属品</option><option value="fabric">原反</option></select></div>
+        <div><label class="f">区分</label><select id="niCat"><option value="accessory">付属品</option><option value="fabric">原反</option><option value="supply">消耗品</option></select></div>
         <div><label class="f">グループNo</label><input id="niGroup" type="number" value="6" style="width:70px"></div>
         <div><label class="f">グループ名</label><input id="niGname" placeholder="カバー 等" style="width:120px"></div>
         <div style="flex:1;min-width:160px"><label class="f">品名</label><input id="niName" placeholder="品名" style="width:100%"></div>
@@ -390,7 +390,7 @@ async function loadInv(){
     const d=await api("/api/admin/inv");
     const rowHtml=it=>{
       const pct=Math.max(2,Math.round(it.remain/Math.max(1,it.cap)*100));
-      const badge=it.fabric_type||'ACC';
+      const badge=it.fabric_type||(it.category==='supply'?'SUP':'ACC');
       return `<tr>
         <td style="white-space:nowrap"><span class="fb ${badge}">${esc(it.code)}</span> ${esc(it.name)}</td>
         <td style="width:24%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>

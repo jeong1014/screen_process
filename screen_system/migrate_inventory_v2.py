@@ -1,7 +1,7 @@
 """
 migrate_inventory_v2.py
   在庫を「品目コード + シリアルQR」方式へ移行する。
-  - inv_item : 品目マスター(エクセル準拠, コード 11〜61)
+  - inv_item : 品目マスター(エクセル準拠, コード 11〜61 + 消耗品 71〜74)
   - inv_unit : シリアル個体(QR1枚 = 実物1本/1箱, in_stock/consumed)
   - inv_tx   : 入出庫履歴(発行=+1 / 消尽=-1)
   付属品の単位は全て「箱」、原反は「ロール」。
@@ -20,8 +20,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1234@localh
 DDL = r"""
 CREATE TABLE IF NOT EXISTS inv_item (
     code          TEXT PRIMARY KEY,                 -- '11'〜'61'
-    category      TEXT NOT NULL,                     -- 'fabric' | 'accessory'
-    group_no      SMALLINT NOT NULL,                 -- 1〜6
+    category      TEXT NOT NULL,                     -- 'fabric' | 'accessory' | 'supply'
+    group_no      SMALLINT NOT NULL,                 -- 1〜7
     group_name    TEXT NOT NULL,                     -- 原反 / マジックテープ ...
     name          TEXT NOT NULL,                     -- 品名
     fabric_type   TEXT,                              -- 'LN'|'DP'|'SDP' (原反のみ)
@@ -83,6 +83,11 @@ ITEMS = [
     ("51", "accessory", 5, "糸", "糸", None, None, "箱", 51),
     # 6. カバー (箱)
     ("61", "accessory", 6, "カバー", "白色ウェビング", None, None, "箱", 61),
+    # 7. 消耗品 — 工場備品(プリンタ用の資材)。生産材料ではないので category='supply'。
+    ("71", "supply", 7, "消耗品", "ラベル紙(注文ラベル用 110mm)",        None, None, "ロール", 71),
+    ("72", "supply", 7, "消耗品", "熱転写リボン(110mm)",                 None, None, "本",     72),
+    ("73", "supply", 7, "消耗品", "ラベルシール(在庫QR用 29×90mm)",      None, None, "ロール", 73),
+    ("74", "supply", 7, "消耗品", "A4用紙(送り状プリンタ用)",            None, None, "箱",     74),
 ]
 
 UPSERT = """
@@ -107,8 +112,8 @@ def main():
         cur.execute(DDL)
         for it in ITEMS:
             code, cat, gno, gname, name, ft, flame, unit, so = it
-            cap = 10 if cat == "fabric" else 20
-            reorder = 3 if cat == "fabric" else 5
+            cap = {"fabric": 10, "supply": 10}.get(cat, 20)
+            reorder = {"fabric": 3, "supply": 2}.get(cat, 5)
             cur.execute(UPSERT, (code, cat, gno, gname, name, ft, flame, unit, cap, reorder, so))
         conn.commit()
         cur.execute("SELECT count(*) FROM inv_item")
