@@ -238,7 +238,7 @@ async function orderDetail(no){
       <td><b>${esc(it.barcode)}</b></td><td><span class="fb ${it.fabric}">${it.fabric}</span></td><td>${esc(it.size)}</td>
       <td>${esc(it.product_type)}×${it.quantity}</td>
       <td>上:${esc(it.opts.top)} 下:${esc(it.opts.bottom)} 左:${esc(it.opts.left)} 右:${esc(it.opts.right)}</td>
-      <td><select onchange="fixStage('${it.barcode}',this.value)">${[0,1,2,3,4,5,6,7,8].map(s=>`<option value="${s}" ${s===it.stage?'selected':''}>${s}</option>`).join("")}</select></td>
+      <td><select onchange="fixStage('${it.barcode}',this.value)">${[0,1,2,3,4,5,6].map(s=>`<option value="${s}" ${s===it.stage?'selected':''}>${s}</option>`).join("")}</select></td>
       <td><a class="b b-gray" href="/label/${encodeURIComponent(it.barcode)}?print=1" target="_blank" style="text-decoration:none">🖨 ラベル</a></td></tr>`).join("");
     const scans=d.scans.length?`<div class="scroll" style="max-height:200px"><table><tr><th>時刻</th><th>製品</th><th>工程</th><th>種別</th></tr>${
       d.scans.map(s=>`<tr><td>${esc(s.t)}</td><td>${esc(s.barcode)}</td><td>${esc(s.stage_name)}</td><td>${esc(s.event)}</td></tr>`).join("")}</table></div>`:`<div class="muted">スキャン履歴なし</div>`;
@@ -575,7 +575,7 @@ function setHMode(m){
     F.innerHTML=`<div class="row" style="margin-bottom:12px">
       <div><label class="f">期間</label><input id="hdf" type="date"> ~ <input id="hdt" type="date"></div>
       <div><label class="f">検索(バーコード/注文番号)</label><input id="hq" placeholder="ORD-..."></div>
-      <div><label class="f">工程</label><select id="hstage"><option value="">全部</option>${[1,2,3,4,5,6,7,8].map(s=>`<option value="${s}">${s}</option>`).join("")}</select></div>
+      <div><label class="f">工程</label><select id="hstage"><option value="">全部</option>${[1,2,3,4,5,6].map(s=>`<option value="${s}">${s}</option>`).join("")}</select></div>
       <button class="b b-pri" onclick="loadHistory()">照会</button>
       <button class="b b-ok" onclick="csvHistory()">CSV</button>
       <button class="b b-gray" onclick="printHistory()">🖨 印刷</button>

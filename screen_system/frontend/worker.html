@@ -109,14 +109,13 @@
     <option value="0">裁断</option>
     <option value="1">ミシン</option>
     <option value="2">ハトメ</option>
-    <option value="3">梱包</option>
   </select>
 </div>
 
 <div id="top">
   <div id="topOrder"><span id="ono">製品番号 —</span></div>
   <div id="steps">
-    <div class="step">裁断</div><div class="step">ミシン</div><div class="step">ハトメ</div><div class="step">梱包</div>
+    <div class="step">裁断</div><div class="step">ミシン</div><div class="step">ハトメ</div>
   </div>
   <div id="stage">スキャン待機中</div>
   <div id="stageSub">ラベルのバーコードをスキャンしてください</div>
@@ -132,18 +131,18 @@
 <script>
 /* =====================================================================
    ★ 工程別ワンスキャン方式(工程ごとに 開始→完了 の2スキャン)
-   ・工程は 裁断 → ミシン → ハトメ → 梱包 の4つ
+   ・工程は 裁断 → ミシン → ハトメ の3つ(ハトメ完了が最終。梱包工程は廃止)
    ・各工程で表示する情報が異なる:
        裁断 : サイズ / 生地の種類
        ミシン: マジックテープ / スカートの有無
-       ハトメ: 上面/下面/左面/右面 それぞれの間隔(面ごとに異なる)
-       梱包 : 追加情報なし(スキャンで送り状発行)
+       ハトメ: 上辺/下辺/左辺/右辺 それぞれの間隔(辺ごとに異なる)
+              ※ ハトメ完了スキャンで送り状を自動発行
    ・「戻る」= データは消さず、1つ前の工程(段階)に戻るだけ。何度でも可
    ・右上「スキャン」= テスト用。実スキャナはキーボード入力+Enterで自動捕捉
    ・右上「表示工程」= この端末で表示する工程を固定できる
        → 端末を工程別に分ける運用(1番=裁断だけ 等)に対応
    ・FastAPI接続時 USE_MOCK=false
-     GET  /api/orders/{order_no}   → {..., stage: 0〜8}
+     GET  /api/orders/{order_no}   → {..., stage: 0〜6}
      POST /api/scan {order_no}     → stage+1
      POST /api/scan/undo {order_no}→ stage-1
    ===================================================================== */
@@ -154,11 +153,10 @@ const PROC = [
   {key:"cutting", name:"裁断"},
   {key:"sewing",  name:"ミシン"},
   {key:"eyelet",  name:"ハトメ"},
-  {key:"packing", name:"梱包"},
 ];
 /* stage: 0=受付, 1=裁断中,2=裁断完了, 3=ミシン中,4=ミシン完了,
-          5=ハトメ中,6=ハトメ完了, 7=梱包中,8=梱包完了 */
-const MAX_STAGE = 8;
+          5=ハトメ中,6=ハトメ完了(=最終) ※梱包工程は廃止 */
+const MAX_STAGE = 6;
 
 /* ---- 工程別フィールド定義 ---- */
 const FIELDS = {
@@ -166,8 +164,7 @@ const FIELDS = {
   sewing:  [["マジックテープ","magictape"],["ベルクロ種別","velcro_type"],
             ["スカート","skirt"],["スカート取付","skirt_attachment"],["スカート継ぎ目","skirt_no_seam"]],
   /* ハトメは面ごとに間隔が違う → 4面それぞれ表示 + 配置方式 */
-  eyelet:  [["上面","e_top"],["下面","e_bottom"],["左面","e_left"],["右面","e_right"],["配置方式","eyelet_method"]],
-  packing: [],   /* 梱包は追加情報なし */
+  eyelet:  [["上辺","e_top"],["下辺","e_bottom"],["左辺","e_left"],["右辺","e_right"],["配置方式","eyelet_method"]],
 };
 
 /* 「なし」扱いにする値(薄く表示) */
@@ -216,7 +213,7 @@ async function handleScan(code){
 
   if(order.stage >= MAX_STAGE){
     render(order);
-    setStage("error","全工程 完了済み","この注文は梱包まで完了しています");
+    setStage("error","全工程 完了済み","この注文はハトメ(最終)まで完了しています");
     updateBackBtn();
     lastShownAt = Date.now();
     return;
@@ -271,8 +268,9 @@ async function advance(order, d){
 
 /* ---- 工程index(全工程モードの表示対象) ---- */
 function procFromStage(stage){
-  let p = (stage % 2 === 1) ? Math.floor((stage-1)/2) : Math.min(3, stage/2);
-  if(stage >= MAX_STAGE) p = 3;
+  // 工程は 0=裁断 1=ミシン 2=ハトメ の3つ(最後のindexは2)
+  let p = (stage % 2 === 1) ? Math.floor((stage-1)/2) : Math.min(2, stage/2);
+  if(stage >= MAX_STAGE) p = 2;
   return p;
 }
 function displayIdx(o){ return (viewMode === "all") ? procFromStage(o.stage) : viewMode; }
@@ -355,7 +353,7 @@ function renderFields(idx, o){
   const fields = FIELDS[key];
   if(!fields.length){
     document.getElementById("info").innerHTML =
-      '<div class="empty">梱包工程<br>追加の作業情報はありません<br>スキャンで送り状を発行します</div>';
+      '<div class="empty">この工程では<br>追加の作業情報はありません</div>';
     return;
   }
   let html = fields.map(([k,f])=>{
@@ -366,7 +364,7 @@ function renderFields(idx, o){
            '<span class="v'+(isNone?' none':'')+'">'+val+'</span></div>';
   }).join("");
   /* ハトメ工程だけ、スキャンしてから作業完了までこの参考図を表示し続ける
-     (完了スキャン後は displayIdx が次工程=梱包に切り替わるため自動的に消える) */
+     (ハトメ完了スキャン後は最終完了状態に切り替わるため自動的に消える) */
   if(key === "eyelet"){
     const method = o ? o.eyelet_method_code : null;
     const pitch = o ? o.eyelet_pitch_mm : null;

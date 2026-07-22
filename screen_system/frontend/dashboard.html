@@ -19,7 +19,13 @@
   body{
     background:var(--bg); color:var(--text); overflow:hidden;
     font-family:"Yu Gothic UI","Yu Gothic","Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;
+    display:flex; align-items:center; justify-content:center;
+  }
+  /* 1920x1080 基準でデザインし、実画面(1280x720 / 1366x768 等)に合わせて全体を等倍縮小 */
+  #dashscale{
+    width:1920px; height:1080px; flex:0 0 auto;
     display:flex; flex-direction:column;
+    transform-origin:center center;
   }
 
   /* ===== ヘッダー ===== */
@@ -131,6 +137,7 @@
 </head>
 <body>
 
+<div id="dashscale">
 <header>
   <h1>作業現況板</h1>
   <span class="date" id="date"></span>
@@ -172,6 +179,20 @@
     </div>
   </div>
 </div>
+</div><!-- /#dashscale -->
+
+<script>
+/* 1920x1080 基準の内容を実画面サイズに合わせて等倍縮小(1280x720 / 1366x768 等でも切れない) */
+function fitDash(){
+  const el = document.getElementById("dashscale");
+  if(!el) return;
+  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  el.style.transform = "scale(" + s + ")";
+}
+window.addEventListener("resize", fitDash);
+document.addEventListener("DOMContentLoaded", fitDash);
+fitDash();
+</script>
 
 <script>
 /* =====================================================================
@@ -190,7 +211,6 @@ const PROC = [
   {key:"cutting", name:"裁断"},
   {key:"sewing",  name:"ミシン"},
   {key:"eyelet",  name:"ハトメ"},
-  {key:"packing", name:"梱包"},
 ];
 
 /* ---- モックデータ(注文番号は仮) ---- */
@@ -199,19 +219,19 @@ const MOCK = {
     {order_no:"WO-TEST-002", fabric:"SDP", size:"W5000×H4000", qty:"2セット / 合計4枚",
      opts:{top:"ハトメP300", bottom:"スカート", left:"ハトメP200", right:"なし"},
      received_at:"08:12",
-     status:{cutting:"working",sewing:"wait",eyelet:"wait",packing:"wait"}},
+     status:{cutting:"working",sewing:"wait",eyelet:"wait"}},
     {order_no:"WO-20260702-003", fabric:"DP", size:"W2800×H3000", qty:"1枚",
      opts:{top:"ハトメP300", bottom:"なし", left:"なし", right:"なし"},
      received_at:"09:05",
-     status:{cutting:"done",sewing:"working",eyelet:"wait",packing:"wait"}},
+     status:{cutting:"done",sewing:"working",eyelet:"wait"}},
     {order_no:"WO-20260702-004", fabric:"LN", size:"W3000×H2500", qty:"1セット / 合計2枚",
      opts:{top:"ベルクロ", bottom:"スカート", left:"なし", right:"なし"},
      received_at:"10:20",
-     status:{cutting:"done",sewing:"done",eyelet:"done",packing:"done"}},
+     status:{cutting:"done",sewing:"done",eyelet:"done"}},
     {order_no:"WO-20260702-005", fabric:"SDP", size:"W4000×H3000", qty:"1枚",
      opts:{top:"ハトメP300", bottom:"スカート", left:"なし", right:"なし"},
      received_at:"11:02",
-     status:{cutting:"wait",sewing:"wait",eyelet:"wait",packing:"wait"}},
+     status:{cutting:"wait",sewing:"wait",eyelet:"wait"}},
   ],
   inventory: [
     {fabric:"LN",  remain:6, cap:10},
@@ -226,7 +246,7 @@ const MOCK = {
   ],
   events: [
     {t:"11:42", order_no:"WO-20260702-004", ev:"ship",  text:"送り状発行"},
-    {t:"11:41", order_no:"WO-20260702-004", ev:"done",  text:"梱包 完了"},
+    {t:"11:41", order_no:"WO-20260702-004", ev:"ship",  text:"ハトメ完了(出荷準備)"},
     {t:"10:55", order_no:"WO-20260702-003", ev:"start", text:"ミシン 開始"},
     {t:"10:31", order_no:"WO-TEST-002",     ev:"start", text:"裁断 開始"},
     {t:"09:58", order_no:"WO-20260702-004", ev:"done",  text:"ハトメ 完了"},
@@ -235,9 +255,9 @@ const MOCK = {
 
 /* ---- 状態判定: 作業状態の文言と色 ----
    working中 → 「裁断中」 / 完了直後の待機 → 「裁断完了」 / 未着手 → 「裁断待ち」
-   梱包done → 「出荷準備完了」 */
+   ハトメ(eyelet)done → 「出荷準備完了」(=最終完了。梱包工程は廃止) */
 function statusOf(o){
-  if(o.status.packing==="done") return {cls:"ship", text:"出荷準備完了"};
+  if(o.status.eyelet==="done") return {cls:"ship", text:"出荷準備完了"};
   for(let i=PROC.length-1;i>=0;i--){
     if(o.status[PROC[i].key]==="working") return {cls:"working", text:PROC[i].name+"中"};
   }
@@ -267,7 +287,7 @@ function renderInvList(el, items, opts){
 function render(data){
   /* 受付時間順に並べ、出荷準備完了は後ろへ */
   const list = [...data.orders].sort((a,b)=>{
-    const sa = a.status.packing==="done", sb = b.status.packing==="done";
+    const sa = a.status.eyelet==="done", sb = b.status.eyelet==="done";
     if(sa!==sb) return sa?1:-1;
     return a.received_at.localeCompare(b.received_at);
   });

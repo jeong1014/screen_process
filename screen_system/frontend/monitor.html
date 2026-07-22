@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工程モニター | CDI</title>
+<title>工程 | CDI</title>
 <style>
   :root{
     --bg:#0d1b2a; --panel:#16283c; --line:#274156; --text:#eaf2fb; --sub:#8aa6c0;
@@ -26,7 +26,9 @@
   .main{flex:1;display:flex;gap:18px;padding:18px 24px;min-height:0;}
   .left{flex:1.4;display:flex;flex-direction:column;gap:16px;min-width:0;}
   .big{flex:1;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:var(--panel);border:3px solid #294056;text-align:center;padding:22px;}
+    background:var(--panel);border:3px solid #294056;text-align:center;padding:22px;overflow:hidden;}
+  /* 画面に収まるよう内容全体を等倍縮小するラッパ(オプションが切れないように) */
+  .bigfit{transform-origin:center center;}
   .big.start{background:var(--start-bg);border-color:var(--start);}
   .big.ok{background:var(--ok-bg);border-color:var(--ok);}
   .big.err{background:var(--err-bg);border-color:var(--err);}
@@ -38,13 +40,30 @@
   .fb{display:inline-block;font-weight:900;color:#04121f;border-radius:10px;padding:0 14px;}
 
   /* 工程別情報(作業者画面のように大きく) */
-  .pf{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 22px;margin-top:16px;width:100%;}
+  .pf{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 22px;margin-top:16px;width:700px;max-width:100%;}
   .pf-item{background:rgba(255,255,255,.06);border-radius:16px;padding:16px 26px;min-width:200px;}
   .pf-k{font-size:24px;font-weight:800;color:var(--sub);}
   .pf-v{font-size:60px;font-weight:900;line-height:1.05;margin-top:4px;}
   .pf-v.none{color:#6f8aa3;}
   /* ハトメモニターだけ: 配置方式(A/B)の参考図 */
   .eyelet-diagram{background:rgba(255,255,255,.06);border-radius:16px;padding:10px 6px;margin-top:14px;width:100%;max-width:560px;}
+  /* ハトメ: 上下左右の間隔を実際の位置(十字)に配置 */
+  /* 十字: 各セルは内容サイズ(auto)。1frで潰さないので桁が重ならない */
+  .cross{display:grid;grid-template-columns:repeat(3,auto);justify-content:center;gap:12px 16px;margin:14px auto 0;}
+  .cross .top{grid-area:1/2/2/3;} .cross .left{grid-area:2/1/3/2;}
+  .cross .mid{grid-area:2/2/3/3;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:2px dashed #3a5573;border-radius:14px;color:var(--sub);font-size:20px;font-weight:800;min-height:64px;min-width:150px;}
+  .cross .right{grid-area:2/3/3/4;} .cross .bottom{grid-area:3/2/4/3;}
+  .cross .pf-item{min-width:170px;width:auto;margin:0;}
+  .method{margin:14px auto 0;}
+  .method .pf-item{min-width:0;width:100%;}
+  /* ハトメ: 十字(左) + 配置方式・参考図(右) の横2カラム。各カラムは自然幅、全体を bigfit が縮小 */
+  .eyelet-2col{display:flex;gap:28px;align-items:center;justify-content:center;margin:14px auto 0;}
+  .eyelet-2col .col-cross{flex:0 0 auto;}
+  .eyelet-2col .col-side{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:460px;max-width:460px;}
+  .eyelet-2col .cross{margin:0;}
+  .eyelet-2col .method{margin:0;width:100%;}
+  .eyelet-2col .eyelet-diagram{margin-top:0;width:100%;max-width:460px;}
 
   .right-col{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0;}
   .col{flex:1;background:var(--panel);border:2px solid #294056;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;min-height:0;}
@@ -65,7 +84,7 @@
 </head>
 <body>
 <header>
-  <div><span class="proc" id="procName">—</span> <span class="ko">モニター</span></div>
+  <div><span class="proc" id="procName">—</span> <span class="ko">工程</span></div>
   <div class="right">
     <div class="kpi"><div class="v" id="qCount">0</div><div class="l">待機</div></div>
     <div class="kpi"><div class="v" style="color:var(--start)" id="wCount">0</div><div class="l">作業中</div></div>
@@ -115,7 +134,7 @@ async function load(){
     document.getElementById("stime").textContent = "サーバー "+d.server_time;
     renderList("queue", d.queue);
     renderList("wip", d.wip);
-    document.title = d.name_ja+"モニター | CDI";
+    document.title = d.name_ja+"工程 | CDI";
     // 「big」表示はページを開いた直後の1回、またはスキャン直後(doScan側で表示済み)にのみ更新する。
     // ここで毎回 d.last を再表示すると、15秒経ってアイドルに戻した直後にまた同じ結果が
     // 表示されてしまい、いつまでも完了画面が固定されているように見えるため。
@@ -152,55 +171,121 @@ function renderList(id, arr){
 }
 /* ---- ハトメ配置方式(A/B)の参考図。実寸ではなく概念図(ピッチ表示のみ実際の値) ---- */
 function eyeletDiagramSVG(method, pitchMm){
-  const pitchLabel = pitchMm ? pitchMm+"mm" : "P";
+  const pitchLabel = pitchMm ? pitchMm+"mm" : "指定ピッチ";
+  // 端(コーナー)を表す縦線
+  const post = (x,c)=>`<line x1="${x}" y1="64" x2="${x}" y2="116" stroke="${c}" stroke-width="5" stroke-linecap="round"/>`;
+  // 間隔の寸法表示(両矢印 + ラベル)
+  const dim = (x1,x2,color,label)=>{
+    const y=134, mid=(x1+x2)/2;
+    return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="2"/>
+      <line x1="${x1}" y1="${y-5}" x2="${x1}" y2="${y+5}" stroke="${color}" stroke-width="2"/>
+      <line x1="${x2}" y1="${y-5}" x2="${x2}" y2="${y+5}" stroke="${color}" stroke-width="2"/>
+      <text x="${mid}" y="${y+20}" font-size="14" font-weight="800" fill="${color}" text-anchor="middle">${label}</text>`;
+  };
   if(method === "A"){
-    const xs = [0,110,220,330,440];
-    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
-      <text x="310" y="30" font-size="20" font-weight="800" fill="#38bdf8" text-anchor="middle">方式A・コーナー基準(ピッチ ${pitchLabel})</text>
+    // コーナーから固定ピッチで配置。最後のドットは端(コーナー)まで届かず「端数」が残る。
+    const xs = [20,130,240,350,460,570], endX = 600;
+    return `<svg viewBox="0 0 620 168" style="width:100%;display:block;margin:0 auto">
+      <text x="310" y="24" font-size="18" font-weight="800" fill="#38bdf8" text-anchor="middle">方式A・コーナー基準(ピッチ ${pitchLabel} 固定)</text>
       <rect x="20" y="86" width="580" height="8" fill="#22384e" rx="4"/>
-      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#0d1b2a" stroke="#38bdf8" stroke-width="4"/>`).join("")}
-      <circle cx="600" cy="90" r="13" fill="#0d1b2a" stroke="#f59e0b" stroke-width="4"/>
-      <line x1="480" y1="90" x2="587" y2="90" stroke="#f59e0b" stroke-width="4" stroke-dasharray="8 7"/>
-      <text x="533" y="130" font-size="16" font-weight="800" fill="#f59e0b" text-anchor="middle">端数</text>
-      <text x="310" y="158" font-size="14" fill="#8aa6c0" text-anchor="middle">コーナーから ${pitchLabel} 間隔で順に配置 → 最後に端数が出る場合あり</text>
+      ${post(20,'#8aa6c0')}${post(600,'#8aa6c0')}
+      <line x1="${xs[xs.length-1]}" y1="90" x2="${endX}" y2="90" stroke="#f59e0b" stroke-width="8" stroke-dasharray="6 6"/>
+      ${xs.map(x=>`<circle cx="${x}" cy="90" r="12" fill="#0d1b2a" stroke="#38bdf8" stroke-width="4"/>`).join("")}
+      <circle cx="${endX}" cy="90" r="7" fill="#f59e0b"/>
+      ${dim(130,240,'#38bdf8', pitchLabel+' 固定')}
+      ${dim(570,600,'#f59e0b','端数(余り)')}
+      <text x="310" y="164" font-size="13" fill="#8aa6c0" text-anchor="middle">コーナーから ${pitchLabel} で配置 → 反対の端に「端数(余り)」が出る</text>
     </svg>`;
   }
   if(method === "B"){
-    const xs = [0,116,232,348,464,580];
-    return `<svg viewBox="0 0 620 170" style="width:100%;max-width:560px;display:block;margin:0 auto">
-      <text x="310" y="30" font-size="20" font-weight="800" fill="#22c55e" text-anchor="middle">方式B・間隔均等(基準ピッチ ${pitchLabel})</text>
+    // 両端(コーナー)にドットを合わせ、全間隔を均等に調整。端数は出ない。
+    const xs = [20,136,252,368,484,600];
+    return `<svg viewBox="0 0 620 168" style="width:100%;display:block;margin:0 auto">
+      <text x="310" y="24" font-size="18" font-weight="800" fill="#22c55e" text-anchor="middle">方式B・間隔均等(ピッチを自動調整)</text>
       <rect x="20" y="86" width="580" height="8" fill="#22384e" rx="4"/>
-      ${xs.map(x=>`<circle cx="${20+x}" cy="90" r="13" fill="#0d1b2a" stroke="#22c55e" stroke-width="4"/>`).join("")}
-      <text x="310" y="158" font-size="14" fill="#8aa6c0" text-anchor="middle">端から端まで等間隔になるようピッチを調整 → 端数は出ません</text>
+      ${post(20,'#22c55e')}${post(600,'#22c55e')}
+      ${xs.map(x=>`<circle cx="${x}" cy="90" r="12" fill="#0d1b2a" stroke="#22c55e" stroke-width="4"/>`).join("")}
+      ${dim(20,136,'#22c55e','均等')}${dim(136,252,'#22c55e','均等')}${dim(252,368,'#22c55e','均等')}
+      <text x="310" y="164" font-size="13" fill="#8aa6c0" text-anchor="middle">両端(コーナー)にぴったり合わせ、全間隔を均等に調整 → 端数なし</text>
     </svg>`;
   }
   return `<div style="text-align:center;color:#8aa6c0;font-size:20px;font-weight:800;padding:20px 10px;line-height:1.6">配置方式(方式C)は現在未定です</div>`;
 }
 // 結果+工程別情報(作業者画面のように)大きく表示
+/* 大画面(#big)の内容を .bigfit で包み、画面からはみ出す時だけ等倍で縮小する。
+   → どの現場モニター(1280x720 / 1366x768 等)でもオプションが切れずに、
+     収まる範囲で最大の文字サイズで表示される。 */
+function setBig(cls, html){
+  const b = document.getElementById("big");
+  b.className = "big" + (cls ? " " + cls : "");
+  b.innerHTML = '<div class="bigfit">' + html + '</div>';
+  fitBig();
+}
+function fitBig(){
+  const b = document.getElementById("big");
+  const fit = b && b.querySelector(".bigfit");
+  if(!fit) return;
+  const cs = getComputedStyle(b);
+  const availW = b.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const availH = b.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+  if(availW <= 0 || availH <= 0) return;
+  // 内容を自然サイズで組ませ(各レイアウトは固有幅を持つ)、その大きさから縮小率を決める。
+  // 横2カラム(ハトメ)は自然幅が広いので、はみ出す分だけ等倍で縮小 → 桁が重ならない。
+  fit.style.transform = "none";
+  const w = fit.scrollWidth, h = fit.scrollHeight;
+  if(!h || !w) return;
+  // 端に少し余白を残す(左右・上下が切れて見えないように)
+  let s = Math.min((availW * 0.92) / w, (availH * 0.95) / h);
+  s = Math.min(1, s);   // はみ出す時だけ縮小(拡大はしない)
+  fit.style.transform = "scale(" + s + ")";
+}
+window.addEventListener("resize", fitBig);
+
 function showResult(o, extra){
   const cls = o.result==="完了" ? "ok" : "start";
+  const head = `<div class="res">${esc(o.result)}</div>
+    <div class="bc"><span class="fb ${o.fabric}">${esc(o.fabric)}</span> ${esc(o.barcode)}</div>`;
+  const meta = extra ? `<div class="rmeta">${esc(extra)}</div>` : "";
+
+  // ハトメ: 上下左右の間隔を実際の位置(十字)で表示 + 配置方式 + 参考図
+  if(PROC === "eyelet"){
+    const fmap = {}; (o.fields||[]).forEach(f => fmap[f[0]] = f[1]);
+    const cell = k => {
+      const v = fmap[k]; const none = NONE.includes(String(v).trim());
+      return `<div class="pf-item"><div class="pf-k">${esc(k)}</div><div class="pf-v${none?' none':''}">${esc(none?'なし':v)}</div></div>`;
+    };
+    const method = fmap["配置方式"]; const mnone = NONE.includes(String(method).trim());
+    const cross = `<div class="cross">
+      <div class="top">${cell("上辺")}</div>
+      <div class="left">${cell("左辺")}</div>
+      <div class="mid">生地</div>
+      <div class="right">${cell("右辺")}</div>
+      <div class="bottom">${cell("下辺")}</div>
+    </div>`;
+    const methodBox = `<div class="method"><div class="pf-item"><div class="pf-k">配置方式</div><div class="pf-v${mnone?' none':''}">${esc(mnone?'なし':method)}</div></div></div>`;
+    const diagram = `<div class="eyelet-diagram">${eyeletDiagramSVG(o.eyelet_method_code, o.eyelet_pitch_mm)}</div>`;
+    // 十字(左) + 配置方式・完了時刻・参考図(右) の横2カラム
+    setBig(cls, head + `<div class="eyelet-2col">
+      <div class="col-cross">${cross}</div>
+      <div class="col-side">${methodBox}${meta}${diagram}</div>
+    </div>`);
+    return;
+  }
+
   const fields = (o.fields||[]).map(f=>{
     const none = NONE.includes(String(f[1]).trim());
     return `<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v${none?' none':''}">${esc(none?'なし':f[1])}</div></div>`;
   }).join("");
-  // ハトメモニターだけ、スキャンしてから作業完了まで配置方式の参考図を表示し続ける
-  const diagram = (PROC === "eyelet")
-    ? `<div class="eyelet-diagram">${eyeletDiagramSVG(o.eyelet_method_code, o.eyelet_pitch_mm)}</div>` : "";
-  const b=document.getElementById("big"); b.className="big "+cls;
-  b.innerHTML=`<div class="res">${esc(o.result)}</div>
-    <div class="bc"><span class="fb ${o.fabric}">${esc(o.fabric)}</span> ${esc(o.barcode)}</div>
-    <div class="pf">${fields}</div>${extra?`<div class="rmeta">${esc(extra)}</div>`:""}${diagram}`;
+  setBig(cls, head + `<div class="pf">${fields}</div>` + meta);
 }
 function showErr(o){
   const fields = (o.fields||[]).map(f=>`<div class="pf-item"><div class="pf-k">${esc(f[0])}</div><div class="pf-v">${esc(f[1])}</div></div>`).join("");
-  const b=document.getElementById("big"); b.className="big err";
-  b.innerHTML=`<div class="res">エラー</div>
+  setBig("err", `<div class="res">エラー</div>
     <div class="rmeta" style="font-size:30px;color:var(--err)">${esc(o.reason||"")}</div>
-    ${o.barcode?`<div class="bc">${esc(o.barcode)}</div>`:""}<div class="pf">${fields}</div>`;
+    ${o.barcode?`<div class="bc">${esc(o.barcode)}</div>`:""}<div class="pf">${fields}</div>`);
 }
 function showIdle(){
-  document.getElementById("big").className="big";
-  document.getElementById("big").innerHTML=`<div class="hint">ラベルのバーコードをスキャンしてください</div>`;
+  setBig("", `<div class="hint">ラベルのバーコードをスキャンしてください</div>`);
 }
 // ハトメ完了時の送り状印刷。ポップアップ(window.open)は await 後だとブロックされるため、
 // 非表示の iframe に送り状ページを読み込ませる。送り状ページ側が読み込み後に自分で印刷する。
