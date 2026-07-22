@@ -13,30 +13,27 @@ DB  :  環境変数 DATABASE_URL
 
 import os
 import json
-import subprocess
-from weasyprint import HTML
 
-import smtplib
-import ssl
-from email.message import EmailMessage
 from datetime import date, datetime
 
-import psycopg
-from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from print_templates import render_inventory_label, render_order_label, render_shipping_slip
+from db import db, _set_setting
+from security import require_admin, _check_pw_query, _admin_password
+from services.printing import silent_print_html
+from services.mailer import _smtp_config, _send_purchase_email
 
 from config import (
-    DATABASE_URL, FRONTEND_DIR, MAX_STAGE,
+    FRONTEND_DIR, MAX_STAGE,
     SIDE_JA, PROC_BY_STAGE, VELCRO_JA, SKIRT_ATTACH_JA, EYELET_METHOD_JA,
     SHEET_SIDE_JA, STAGE_NAME, _PRODUCT_JP, MON_PROC, INV_GROUPS, DB_TABLES,
 )
 from schemas import (
-    ItemIn, OrderIn, ScanIn, MonScan, InvScanIn, LoginIn,
+    OrderIn, ScanIn, MonScan, InvScanIn, LoginIn,
     AdjustIn, ReorderIn, AccIn,
     InvIssueIn, InvAdjustIn, InvReorderIn, InvItemIn,
     PurchaseReqIn, PurchaseOrderIn, PurchaseSettingsIn,
@@ -45,10 +42,6 @@ from schemas import (
 
 app = FastAPI(title="スクリーン原団 工程管理 v2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-
-def db():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
 # =============================================================================
@@ -142,53 +135,7 @@ def board_status(stage: int):
     }
 
 # 프린터 설정 로드
-def get_printer_name(printer_key: str) -> str:
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "printer_config.json")
-    if not os.path.exists(config_path):
-        print("⚠️ 프린터 설정 파일(printer_config.json)이 없어 기본 기본 프린터를 사용합니다.")
-        return ""
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-            return cfg.get(printer_key, "")
-    except Exception as e:
-        print(f"❌ 프린터 설정 로드 실패: {e}")
-        return ""
 
-def silent_print_html(html_content: str, printer_key: str):
-    """HTML 소스를 받아 PDF로 렌더링한 후, 지정된 프린터로 조용히 출력합니다."""
-    printer_name = get_printer_name(printer_key)
-    if not printer_name:
-        print(f"⚠️ {printer_key}에 매핑된 프린터가 없습니다. 출력을 건너뜁니다.")
-        return
-
-    pdf_temp_path = "temp_print_job.pdf"
-    sumatra_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SumatraPDF.exe")
-
-    try:
-        # 1. WeasyPrint를 사용해 HTML을 규격에 맞는 PDF로 변환 (CSS @page 반영됨)
-        HTML(string=html_content).write_pdf(pdf_temp_path)
-        
-        # 2. SumatraPDF를 이용해 백그라운드 무설정 출력 실행
-        # -print-to <프린터명>: 해당 프린터로 즉시 전송
-        # -print-settings "noscale": 라벨 인쇄 시 여백/스케일 왜곡 방지
-        cmd = [
-            sumatra_path,
-            "-print-to", printer_name,
-            "-print-settings", "noscale",
-            pdf_temp_path
-        ]
-        
-        print(f"🖨️ [{printer_name}] 출력 요청 전송 중...")
-        subprocess.run(cmd, check=True)
-        print("✅ 출력 완료!")
-
-    except Exception as e:
-        print(f"❌ 자동 출력 중 에러 발생: {e}")
-    finally:
-        # 임시 생성된 PDF 파일 제거
-        if os.path.exists(pdf_temp_path):
-            os.remove(pdf_temp_path)
 
 # =============================================================================
 # 入力モデル
@@ -564,33 +511,9 @@ def api_label(barcode: str):
 # =============================================================================
 # 管理者ページ /admin  (簡易パスワード + 各種管理API)
 # =============================================================================
-from fastapi import Header, Query
+from fastapi import Query
 from fastapi.responses import Response
 import csv, io
-
-
-def _get_setting(cur, key, default=None):
-    cur.execute("SELECT value FROM settings WHERE key=%s", (key,))
-    r = cur.fetchone()
-    return r["value"] if r else default
-
-
-def _admin_password(cur):
-    return _get_setting(cur, "admin_password", "1234")
-
-
-def require_admin(x_admin_pass: str = Header(default="")):
-    with db() as conn, conn.cursor() as cur:
-        if x_admin_pass != _admin_password(cur):
-            raise HTTPException(401, "認証が必要です(パスワード)")
-    return True
-
-
-def _check_pw_query(pw: str):
-    """ダウンロードリンク用: クエリ ?pw= で認証。"""
-    with db() as conn, conn.cursor() as cur:
-        if pw != _admin_password(cur):
-            raise HTTPException(401, "認証が必要です(パスワード)")
 
 
 @app.get("/admin")
@@ -951,51 +874,6 @@ def admin_inv_item_delete(code: str, _=Depends(require_admin)):
 # =============================================================================
 # 発注(仕入れ): 依頼 → 資材部へメール → 発注登録(到着予定日) → 入荷
 # =============================================================================
-def _set_setting(cur, key, value):
-    cur.execute("""INSERT INTO settings (key, value, updated_at) VALUES (%s,%s,now())
-                   ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()""",
-                (key, value))
-
-
-def _smtp_config(cur):
-    return {
-        "to":   (_get_setting(cur, "purchase_email_to", "") or "").strip(),
-        "host": (_get_setting(cur, "smtp_host", "") or "").strip(),
-        "port": int(_get_setting(cur, "smtp_port", "587") or "587"),
-        "user": (_get_setting(cur, "smtp_user", "") or "").strip(),
-        "pass": (_get_setting(cur, "smtp_pass", "") or ""),
-        "from": (_get_setting(cur, "smtp_from", "") or "").strip(),
-        "tls":  (_get_setting(cur, "smtp_tls", "starttls") or "starttls").strip(),
-    }
-
-
-def _send_purchase_email(cfg, subject, body):
-    """SMTP設定があればメール送信。未設定なら送らず False を返す(依頼レコードは作られる)。"""
-    if not cfg["to"] or not cfg["host"]:
-        return False, "メール未設定(宛先/SMTPホスト)"
-    sender = cfg["from"] or cfg["user"] or cfg["to"].split(",")[0]
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = cfg["to"]
-    msg.set_content(body)
-    try:
-        if cfg["tls"] == "ssl":
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=ctx, timeout=15) as s:
-                if cfg["user"]:
-                    s.login(cfg["user"], cfg["pass"])
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as s:
-                if cfg["tls"] == "starttls":
-                    s.starttls(context=ssl.create_default_context())
-                if cfg["user"]:
-                    s.login(cfg["user"], cfg["pass"])
-                s.send_message(msg)
-        return True, "送信しました"
-    except Exception as e:
-        return False, f"送信失敗: {str(e).splitlines()[0]}"
 
 
 @app.post("/api/admin/purchase")
@@ -1656,10 +1534,9 @@ def api_monitor_scan(proc: str, body: MonScan):
 # =============================================================================
 import threading
 import time
-import serial
-import json
-import os
 import re
+
+import serial
 
 # JSON 설정 파일을 읽어오는 함수
 def load_scanner_config():
