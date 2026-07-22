@@ -458,6 +458,13 @@ RENDER.po_req=async ()=>{
     <div class="row" style="margin-bottom:12px">
       <div><label class="f">依頼者(任意)</label><input id="poBy" placeholder="お名前 / 端末名" style="width:160px"></div>
       <button class="b b-gray" onclick="toggleMail()">✉ メール設定</button>
+      <div style="flex:1;min-width:220px;text-align:right">
+        <span class="muted">現在の送信先 </span><b id="poTo">確認中...</b>
+      </div>
+    </div>
+    <div class="muted" style="margin:-6px 0 10px;font-size:12px">
+      送信先は全品目で共通です。消耗品など宛先が違うものを依頼する時は、
+      「✉ メール設定」で宛先を変えてから依頼し、<b>終わったら元に戻してください</b>。
     </div>
     <div id="poMail" style="display:none"></div>
     <div id="poReqBody" class="muted">読み込み中...</div></div>`;
@@ -470,7 +477,7 @@ async function loadPoReq(){
         <td style="white-space:nowrap"><span class="fb ${it.fabric_type||(it.category==='supply'?'SUP':'ACC')}">${esc(it.code)}</span> ${esc(it.name)}</td>
         <td class="muted">在庫 <b style="color:${it.low?'var(--danger)':'var(--text)'}">${it.remain}</b>/${it.cap} ${esc(it.unit)} ${it.low?'<span class="low-txt">要発注</span>':''}</td>
         <td><input type="number" min="1" value="${Math.max(1,it.reorder||1)}" id="poq_${it.code}" style="width:72px"> ${esc(it.unit)}</td>
-        <td><button class="b b-pri" onclick="sendPoReq('${it.code}')">依頼</button></td></tr>`;
+        <td><button class="b b-pri" onclick="sendPoReq('${it.code}','${esc(it.name)}','${esc(it.unit)}')">依頼</button></td></tr>`;
     let html="";
     for(const g of (d.groups||[])){
       const rows=(d.items||[]).filter(x=>x.group_no===g.no);
@@ -479,11 +486,26 @@ async function loadPoReq(){
     }
     document.getElementById("poReqBody").innerHTML=html||'<div class="muted">品目がありません。</div>';
   }catch(e){ document.getElementById("poReqBody").innerHTML=`<div class="low-txt">${esc(e.message)}</div>`; }
+  loadPoTo();
 }
-async function sendPoReq(code){
+
+// 発注メールの現在の宛先。依頼を押す前に画面で見えるようにしておく
+// (宛先は全品目共通で、変えたまま戻し忘れると次の依頼が違う所へ飛ぶため)
+let PO_TO="";
+async function loadPoTo(){
+  const el=document.getElementById("poTo"); if(!el) return;
+  try{
+    const c=await api("/api/admin/purchase/settings");
+    PO_TO=(c.to||"").trim();
+    el.textContent = PO_TO || "未設定";
+    el.style.color = PO_TO ? "var(--text)" : "var(--danger)";
+  }catch(e){ PO_TO=""; el.textContent="取得できません"; el.style.color="var(--danger)"; }
+}
+async function sendPoReq(code, name, unit){
   const qty=parseInt(document.getElementById("poq_"+code).value,10)||0;
   if(qty<1){ alert("必要数を入力してください"); return; }
   const by=document.getElementById("poBy").value.trim()||null;
+  if(!confirm(`${name} を ${qty}${unit} 発注依頼します。\n\n送信先: ${PO_TO||"(メール未設定 — 記録だけ残ります)"}\n\nこの宛先でよろしいですか?`)) return;
   try{
     const r=await api("/api/admin/purchase",{method:"POST",body:JSON.stringify({code,qty,requested_by:by})});
     toast(r.emailed?"依頼しました(メール送信済)":"依頼しました("+(r.email_message||"メール未設定")+")");
@@ -521,7 +543,7 @@ async function saveMail(){
     await api("/api/admin/purchase/settings",{method:"POST",body:JSON.stringify({
       to:g("mTo"),host:g("mHost"),port:g("mPort"),tls:g("mTls"),
       user:g("mUser"),password:g("mPass"),from:g("mFrom")})});
-    toast("メール設定を保存しました"); document.getElementById("mPass").value="";
+    toast("メール設定を保存しました"); document.getElementById("mPass").value=""; loadPoTo();
   }catch(e){ alert(e.message); }
 }
 
