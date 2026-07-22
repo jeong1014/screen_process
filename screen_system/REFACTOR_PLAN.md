@@ -1,10 +1,16 @@
-# app.py 모듈 분리 계획 — ✅ 완료 (브랜치 `refactor/split-app`)
+# app.py 모듈 분리 — ✅ 작업 완료 (브랜치 `refactor/split-app`)
 
-> **실기 검증이 남아 있습니다.** 아래 6번 항목의 스모크 테스트를 공장 환경에서
-> 한 번 돌린 뒤 `main` 에 머지하세요. 특히 **스캔 진행 / UNDO / 송장 자동 출력**.
->
-> 실행: `uvicorn main:app --host 0.0.0.0 --port 8000` (기존 `app:app` 도 동작)
-> 회귀 검사: `python check_api.py verify main`
+**코드 분리와 자동 검증은 전부 끝났습니다. 남은 건 실기 스모크 테스트 하나뿐입니다.**
+
+| | 누가 | 상태 |
+|---|---|---|
+| 1~3장 (설계) | Claude | ✅ |
+| 4장 (0~6단계 실행) | Claude | ✅ 커밋 6개 |
+| 5장 자동 검사 | Claude | ✅ 통과 |
+| **5장 실기 스모크** | **정현준** | 🔴 **남음** |
+| 6장 부수 정리 | Claude | ✅ |
+
+실행: `uvicorn main:app --host 0.0.0.0 --port 8000` (기존 `app:app` 도 그대로 동작)
 
 
 - 대상: `screen_system/app.py` (1938줄, 라우트 약 70개)
@@ -141,61 +147,80 @@ from services.stage import move_stage, monitor_scan
 
 ---
 
-## 4. 실행 순서 (7단계)
+## 4. 실행 순서 — ✅ 전부 완료 (Claude 작업분)
 
-각 단계 끝날 때마다 서버가 정상 기동해야 함. 한 번에 다 옮기지 않음.
+아래 0~6단계는 **이미 실행되어 커밋까지 끝났습니다.** 각 단계가 독립 커밋입니다.
 
-| 단계 | 내용 | 위험도 | 검증 |
+| 단계 | 내용 | 커밋 | 상태 |
 |---|---|---|---|
-| **0** | 브랜치 `refactor/split-app` 생성. `.bak` 3개 정리. **기준 스냅샷 저장**: 서버 띄우고 `/openapi.json`을 `openapi_before.json`으로 저장 | 없음 | — |
-| **1** | `config.py`, `schemas.py` 추출. 순수 데이터라 부작용 없음. app.py는 `from config import *` 로 임시 유지 | 낮음 | 서버 기동 |
-| **2** | `db.py`, `security.py`, `services/printing.py`, `services/mailer.py` 추출 | 낮음 | 서버 기동 + 라벨 인쇄 1회 |
-| **3** | `services/formatting.py` 추출 (순수 함수 뭉치, 의존성 거의 없음) | 낮음 | 대시보드/작업자 화면 로드 |
-| **4** | **`services/stage.py` + `services/inventory.py` 추출.** 여기가 이번 작업의 고비 — 로직을 라우트에서 서비스로 실제로 끌어내림 | **높음** | 스캔 진행/UNDO, 재고 QR 스캔 실기 테스트 |
-| **5** | `routers/` 분리. 라우트를 `APIRouter`로 옮기고 도메인별 파일로 배치 | 중간 | `/openapi.json` diff |
-| **6** | `main.py` 조립. `services/scanner.py`를 서비스 참조로 전환하고 `lifespan`으로 교체. app.py 삭제 | 중간 | 전체 스모크 |
+| **0** | 브랜치 `refactor/split-app` 생성, API 기준 스냅샷 저장 | `45ffaf7` | ✅ |
+| **1** | `config.py`, `schemas.py` 추출 (상수 14개 + 모델 21개) | `c03ced5` | ✅ |
+| **2** | `db.py`, `security.py`, `services/printing.py`, `services/mailer.py` | `7c3bf0a` | ✅ |
+| **3** | `services/formatting.py` (순수 함수 11개) | `cdba3cc` | ✅ |
+| **4** | `services/stage.py` + `inventory.py` + `shipping.py` — 스캐너 순환 import 해소 | `c31f663` | ✅ |
+| **5·6** | `routers/` 11개 분리, `main.py` 조립, `lifespan` 전환 | `ea150ca` | ✅ |
 
-### 4단계를 쪼개는 이유
-
-`_move()`는 스캔 진행·UNDO·시리얼 스캐너 세 곳에서 쓰이는 시스템의 심장부입니다. 여기서 사고가 나면 공장 라인이 멈추므로, 이 단계만 따로 커밋하고 실기 검증 후 다음으로 넘어갑니다.
+> 0단계에서 발견: 작업 트리에 보이던 2520줄 diff는 실제 변경이 아니라 CRLF 줄바꿈 차이였습니다.
+> `core.autocrlf=true` 설정으로 해소했고, 그래서 리팩터링 전 상태는 `099d315` 그대로입니다.
 
 ---
 
-## 5. 검증 방법
+## 5. 검증 결과
 
-**자동 — 엔드포인트 회귀 검사 (가장 중요)**
+### 자동 검사 — ✅ 통과 (Claude 실행 완료)
+
+| 검사 | 방법 | 결과 |
+|---|---|---|
+| API 계약 회귀 | `openapi.json` 전후 diff | ✅ 바이트 단위 동일 (63 paths / 69 routes) |
+| 로직 동일성 | 원본과 AST 비교 | ✅ 정의 117개 완전 일치 (달라진 10개는 의도한 이름 변경) |
+| 미정의 이름 | `pyflakes` | ✅ clean — `api_label`의 `_fetch_item` 누락을 사전 발견해 수정 |
+| 라우트 순서 | 동적 세그먼트 가림 검사 | ✅ 문제 없음 |
+
+언제든 다시 돌릴 수 있습니다:
 
 ```bash
-# 0단계에서 저장해둔 것과 비교
-curl -s localhost:8000/openapi.json | python -m json.tool > openapi_after.json
-diff openapi_before.json openapi_after.json
+cd screen_system
+python check_api.py verify main          # 라우트 목록 + 순서 검사
+python check_api.py dump main > /tmp/after.json
+diff openapi_before.json /tmp/after.json # 비어 있어야 성공
 ```
 
-경로·메서드·요청 스키마가 하나라도 바뀌면 diff에 잡힙니다. 프론트엔드를 안 건드리므로 **diff가 비어 있어야 성공**입니다.
+### 🔴 실기 스모크 — 정현준님이 하실 부분
 
-**수동 — 실기 스모크 (6단계 완료 후)**
+**여기만 남았습니다.** 실제 DB·프린터·바코드 스캐너가 붙은 공장 PC가 필요해서 자동 검사로는 대체가 안 됩니다.
 
-1. 주문 입력 → 라벨 인쇄
-2. 작업자 화면 스캔 진행 → UNDO
-3. 공정 모니터 3종(裁断/ミシン/ハトメ) 스캔
-4. ハトメ完了 시 송장 자동 출력
-5. 재고 QR 발행 → 스캔 차감
-6. 관리자 로그인 → 재고/발주/주문/DB뷰어 각 탭
-7. CSV export 4종
-8. 시리얼 스캐너 백그라운드 스레드 기동 로그 확인
+```bash
+cd screen_system
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+- [ ] 주문 입력 → 라벨 인쇄
+- [ ] 작업자 화면 스캔 진행 → UNDO  ← **가장 중요 (4단계에서 건드린 부분)**
+- [ ] 공정 모니터 3종(裁断/ミシン/ハトメ) 스캔
+- [ ] ハトメ完了 시 송장 자동 출력
+- [ ] 재고 QR 발행 → 스캔 차감
+- [ ] 관리자 로그인 → 재고/발주/주문/DB뷰어 각 탭
+- [ ] CSV export 4종
+- [ ] 시리얼 스캐너 스레드 기동 로그(`🚀 [System] …`) 확인
+
+전부 통과하면 `main` 에 머지하세요. 문제가 생기면 `git reset --hard HEAD~1` 로 단계별 되돌리기가 됩니다.
 
 ---
 
-## 6. 같이 정리할 것 (덤)
-
-옮기는 김에 처리:
+## 6. 같이 정리한 것 (덤) — ✅ 완료
 
 - `import code` 삭제 (미사용)
-- 중간 import 3곳(610, 1615, 1834행)을 각 파일 상단으로 정리
+- 중간 import 3곳(구 610·1615·1834행)을 각 파일 상단으로 정리
 - `@app.on_event("startup")` → `lifespan` 컨텍스트 매니저
-- `_get_setting` / `_set_setting`이 재고·발주·설정 3곳에 흩어져 있는 것을 `db.py`로 통합
+- `_get_setting` / `_set_setting` 을 `db.py` 로 통합
+- 하드코딩 경로(`printer_config.json`, `SumatraPDF.exe`, `scanner_config.json`)를 `config.py` 상수로 이관
+- `app.py` 는 shim 으로 남겨 기존 `uvicorn app:app` 명령이 계속 동작
 
-**손대지 않을 것** (범위를 지키기 위해):
+### 발견했지만 고치지 않은 것 (동작 변경 금지 원칙)
+
+`services/stage.py` 의 `move_stage()` 송장 자동 출력에서 `orders.order_no` 에 **바코드**를 넣어 조회합니다. 바코드는 `order_items.barcode` 라 조회 결과가 비고, 고객 정보 없이 인쇄됩니다. 시리얼 스캐너 경로(`services/scanner.py`)는 `order_id` 로 제대로 조회하고 있어 두 경로의 동작이 다릅니다. 코드에 `NOTE` 를 달아뒀습니다 — 별건으로 처리 필요.
+
+**손대지 않은 것** (범위를 지키기 위해):
 
 - 프론트엔드 HTML — `label.html`(2734줄) / `label_gorilla.html`(2792줄) 중복, `PROC` 수동 동기화 문제는 다음 작업으로 분리
 - DB 스키마·마이그레이션 스크립트
