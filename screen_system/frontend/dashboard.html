@@ -204,7 +204,7 @@ fitDash();
    ===================================================================== */
 const API_BASE = ""; // 同じサーバーから配信 → 同一オリジン
 const USE_MOCK = false; // 実際のバックエンドに接続
-const REFRESH_MS = 10000;
+const REFRESH_MS = 4000;   // 在庫・進捗の自動更新間隔(10s→4s に短縮)
 const MAX_ROWS = 4;                 // 画面に収まる行数(大型モニターに合わせ調整)
 
 const PROC = [
@@ -344,11 +344,14 @@ function render(data){
 async function load(){
   if(USE_MOCK){ render(MOCK); return; }
   try{
+    // cache:"no-store" が無いとブラウザが前回の在庫レスポンスを使い回し、
+    // 画面を更新(F5)するまで在庫が変わって見えない。必ず no-store で最新を取る。
+    const NS = { cache: "no-store" };
     const [orders, events, inventory, accessories] = await Promise.all([
-      fetch(`${API_BASE}/api/board`).then(r=>r.json()),
-      fetch(`${API_BASE}/api/events`).then(r=>r.json()),
-      fetch(`${API_BASE}/api/inventory`).then(r=>r.json()),
-      fetch(`${API_BASE}/api/accessories`).then(r=>r.json()),
+      fetch(`${API_BASE}/api/board`, NS).then(r=>r.json()),
+      fetch(`${API_BASE}/api/events`, NS).then(r=>r.json()),
+      fetch(`${API_BASE}/api/inventory`, NS).then(r=>r.json()),
+      fetch(`${API_BASE}/api/accessories`, NS).then(r=>r.json()),
     ]);
     render({orders, events, inventory, accessories});
   }catch(e){ console.error(e); }
