@@ -275,7 +275,7 @@ def api_label(barcode: str):
         },
         # ラベルの仕様表に出す実データ(以前はテンプレートに固定値が埋まっていた)
         "velcroSides": row.get("velcro_sides"),
-        "velcroType": VELCRO_JA.get(row.get("velcro_type"), ""),
+        "velcroType": (VELCRO_JA.get(row.get("velcro_type"), "") if row.get("velcro_sides") else ""),
         "hasSkirt": bool(row.get("has_skirt")),
         "skirtAttachment": (SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "")
                             if row.get("has_skirt") else ""),

@@ -41,7 +41,7 @@ def admin_purchase_create(body: PurchaseReqIn, _=Depends(require_admin)):
             f"メモ       : {body.note or '-'}",
             f"依頼日時    : {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "",
-            "発注後、管理画面の「発注予定」タブで到着予定日をご入力ください。",
+            "発注後、管理画面の「入品予定」タブで到着予定日をご入力ください。",
         ]
         sent, sent_msg = _send_purchase_email(cfg, subject, "\n".join(lines))
         if sent:

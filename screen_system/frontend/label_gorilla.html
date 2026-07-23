@@ -2765,7 +2765,7 @@
       return [
         ["Fabric", "生地",     a.fabric || "",                       ""],
         ["Size",   "サイズ",   sizeText(a),                          ""],
-        ["Velcro", "ベルクロ", a.velcroSides ? a.velcroSides + "面" : "なし", a.velcroType || ""],
+        ["Velcro", "ベルクロ", a.velcroSides ? a.velcroSides + "面" : "なし", a.velcroSides ? (a.velcroType || "") : ""],
         ["Skirt",  "スカート", a.hasSkirt ? "あり" : "なし",          a.skirtAttachment || ""],
         ["Eyelet", "上/下",    procText(p.top),                      procText(p.bottom)],
         ["",       "左/右",    procText(p.left),                     procText(p.right)]

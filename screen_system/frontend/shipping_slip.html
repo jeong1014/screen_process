@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>送り状</title>
+<title>入品証</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:"Yu Gothic UI","Noto Sans JP",sans-serif;margin:0;padding:18px;color:#111;background:#f4f6f9}
@@ -36,7 +36,7 @@ async function boot(){
     const items = o.items||[];
     document.getElementById("root").outerHTML = `
       <div class="slip">
-        <div class="hd"><span>送り状 (SHIPPING SLIP)</span><span>${esc(o.order_no)}</span></div>
+        <div class="hd"><span>入品証 (NYUHIN)</span><span>${esc(o.order_no)}</span></div>
         <div class="sec">
           <div class="lbl">お届け先 / TO</div>
           <div class="val big">〒 ${esc(o.postal_code||"—")}</div>
@@ -58,11 +58,11 @@ async function boot(){
         </div>
         <div class="foot"><span>チャネル: ${esc(o.channel||"")}</span><span>決済: ${esc(o.payment_status||"")}</span></div>
       </div>`;
-    document.title = "送り状 "+o.order_no;
+    document.title = "入品証 "+o.order_no;
     // ハトメ完了時: iframe内から自分自身を印刷(親のモニター画面ではなく送り状のみが印刷される)
     setTimeout(()=>{ try{ window.focus(); }catch(e){} window.print(); }, 500);
   }catch(e){
-    document.getElementById("root").outerHTML = `<div class="err">送り状を表示できません: ${esc(e.message)}<br>(${esc(barcode)})</div>`;
+    document.getElementById("root").outerHTML = `<div class="err">入品証を表示できません: ${esc(e.message)}<br>(${esc(barcode)})</div>`;
   }
 }
 boot();

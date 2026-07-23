@@ -81,7 +81,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TABS=[["orders","注文"],["inv","在庫"],["po_req","発注依頼"],["po_sched","発注予定"],["ship","出荷"],["history","履歴"],["label","ラベル"],["screens","画面"]];
+const TABS=[["orders","注文"],["inv","在庫"],["po_req","発注依頼"],["po_sched","入品予定"],["ship","出荷"],["history","履歴"],["label","ラベル"],["screens","画面"]];
 const PO_ST_CLS={requested:"warn",ordered:"pri",arrived:"ok",cancelled:"cancelled"};
 const SHIP_JA={ready:"出荷準備完了",label_printed:"送り状発行済",handed_to_sagawa:"佐川引渡し済",completed:"出荷完了"};
 const BIZ_JA={not_requested:"未連携",requested:"連携依頼中",issued:"発行済",failed:"失敗"};
@@ -391,8 +391,12 @@ async function loadInv(){
     const rowHtml=it=>{
       const pct=Math.max(2,Math.round(it.remain/Math.max(1,it.cap)*100));
       const badge=it.fabric_type||(it.category==='supply'?'SUP':'ACC');
+      // 原反(生地)は長い和名の代わりにコード表記(DP/SDP/LN)で見せる。防炎なしは注記。
+      const disp = it.fabric_type
+        ? (it.fabric_type + (it.flame===false ? "(防炎なし)" : ""))
+        : it.name;
       return `<tr>
-        <td style="white-space:nowrap"><span class="fb ${badge}">${esc(it.code)}</span> ${esc(it.name)}</td>
+        <td style="white-space:nowrap"><span class="fb ${badge}">${esc(it.code)}</span> ${esc(disp)}</td>
         <td style="width:24%"><div class="bar"><i class="${it.low?'low':''}" style="width:${pct}%"></i></div></td>
         <td><b>${it.remain}</b> <span class="muted">/ ${it.cap} ${esc(it.unit)}</span> ${it.low?'<span class="low-txt">要発注</span>':''}</td>
         <td class="muted">発注点 <input type="number" value="${it.reorder}" style="width:52px" onchange="setReorderInv('${it.code}',this.value)"></td>
@@ -454,7 +458,7 @@ async function addItem(){
 RENDER.po_req=async ()=>{
   const M=document.getElementById("main");
   M.innerHTML=`<div class="panel"><h2>発注依頼</h2>
-    <div class="muted" style="margin:-4px 0 10px;font-size:12px">品目ごとに必要数を入れて「依頼」を押すと、資材部にメールが届きます。到着予定日は資材部が「発注予定」タブに入力します。<span class="low-txt">要発注</span>=在庫が発注点以下。</div>
+    <div class="muted" style="margin:-4px 0 10px;font-size:12px">品目ごとに必要数を入れて「依頼」を押すと、資材部にメールが届きます。到着予定日は資材部が「入品予定」タブに入力します。<span class="low-txt">要発注</span>=在庫が発注点以下。</div>
     <div class="row" style="margin-bottom:12px">
       <div><label class="f">依頼者(任意)</label><input id="poBy" placeholder="お名前 / 端末名" style="width:160px"></div>
       <button class="b b-gray" onclick="toggleMail()">✉ メール設定</button>
@@ -474,7 +478,7 @@ async function loadPoReq(){
   try{
     const d=await api("/api/admin/inv");
     const rowHtml=it=>`<tr>
-        <td style="white-space:nowrap"><span class="fb ${it.fabric_type||(it.category==='supply'?'SUP':'ACC')}">${esc(it.code)}</span> ${esc(it.name)}</td>
+        <td style="white-space:nowrap"><span class="fb ${it.fabric_type||(it.category==='supply'?'SUP':'ACC')}">${esc(it.code)}</span> ${esc(it.fabric_type ? (it.fabric_type + (it.flame===false?"(防炎なし)":"")) : it.name)}</td>
         <td class="muted">在庫 <b style="color:${it.low?'var(--danger)':'var(--text)'}">${it.remain}</b>/${it.cap} ${esc(it.unit)} ${it.low?'<span class="low-txt">要発注</span>':''}</td>
         <td><input type="number" min="1" value="${Math.max(1,it.reorder||1)}" id="poq_${it.code}" style="width:72px"> ${esc(it.unit)}</td>
         <td><button class="b b-pri" onclick="sendPoReq('${it.code}','${esc(it.name)}','${esc(it.unit)}')">依頼</button></td></tr>`;
@@ -547,9 +551,9 @@ async function saveMail(){
   }catch(e){ alert(e.message); }
 }
 
-// ===== 発注予定 (資材部が到着予定日を入力 / 全員が確認) =====
+// ===== 入品予定 (資材部が到着予定日を入力 / 全員が確認) =====
 RENDER.po_sched=()=>{
-  document.getElementById("main").innerHTML=`<div class="panel"><h2>発注予定</h2>
+  document.getElementById("main").innerHTML=`<div class="panel"><h2>入品予定</h2>
     <div class="muted" style="margin:-4px 0 10px;font-size:12px">依頼中の品目に資材部が到着予定日を入力すると「発注済」になります。届いたら「入荷」を押してください。</div>
     <div class="row" style="margin-bottom:12px">
       <div class="seg" id="poSeg">

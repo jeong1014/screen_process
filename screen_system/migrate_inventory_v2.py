@@ -75,10 +75,9 @@ ITEMS = [
     ("21", "accessory", 2, "マジックテープ", "マジックテープ、HOOK", None, None, "箱", 21),
     ("22", "accessory", 2, "マジックテープ", "マジックテープ、LOOP", None, None, "箱", 22),
     # 3. ウェビング (箱)
-    ("31", "accessory", 3, "ウェビング", "黒色ウェビング", None, None, "箱", 31),
-    # 4. アイレット (箱)
-    ("41", "accessory", 4, "アイレット", "アイレット(24号)", None, None, "箱", 41),
-    ("42", "accessory", 4, "アイレット", "アイレット(28号)", None, None, "箱", 42),
+    ("31", "accessory", 3, "ウェビング", "ウェビング", None, None, "箱", 31),
+    # 4. アイレット (箱) — 品目は1つに統一
+    ("41", "accessory", 4, "アイレット", "アイレット", None, None, "箱", 41),
     # 5. 糸 (箱)
     ("51", "accessory", 5, "糸", "糸", None, None, "箱", 51),
     # 6. カバー (箱)
@@ -115,6 +114,8 @@ def main():
             cap = {"fabric": 10, "supply": 10}.get(cat, 20)
             reorder = {"fabric": 3, "supply": 2}.get(cat, 5)
             cur.execute(UPSERT, (code, cat, gno, gname, name, ft, flame, unit, cap, reorder, so))
+        # 統合・廃止した品目は無効化(在庫画面/発注から消える。既存QRは残る)
+        cur.execute("UPDATE inv_item SET active=FALSE WHERE code='42'")
         conn.commit()
         cur.execute("SELECT count(*) FROM inv_item")
         n = cur.fetchone()[0]

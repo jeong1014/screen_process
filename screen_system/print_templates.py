@@ -269,7 +269,7 @@ def render_shipping_slip(order_no, order_info: dict, items: list):
     </head>
     <body>
       <div class="slip">
-        <div class="hd">CDI 出荷明細書 (Packing Slip) <span>{today_str}</span></div>
+        <div class="hd">CDI 入品証 <span>{today_str}</span></div>
         <div class="sec">
           <div class="lbl">お届け先 / TO</div>
           <div class="val big">〒 {postal}</div>

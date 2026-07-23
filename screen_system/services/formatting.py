@@ -77,7 +77,7 @@ def worker_payload(row, pair_barcode=None):
         # ベルクロは面数(3面=上左右 / 4面)で管理する。なしの注文もある。
         "magictape": velcro_label(row.get("velcro_sides")),
         "velcro_sides": row.get("velcro_sides"),
-        "velcro_type": VELCRO_JA.get(row.get("velcro_type"), "-"),
+        "velcro_type": (VELCRO_JA.get(row.get("velcro_type"), "-") if row.get("velcro_sides") else "なし"),
         "skirt": "有り" if skirt_any else "無し",
         "skirt_attachment": SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "なし") if skirt_any else "なし",
         "skirt_no_seam": "シームレス" if (skirt_any and row.get("skirt_no_seam")) else ("通常" if skirt_any else "なし"),
@@ -138,7 +138,7 @@ def _proc_fields(proc, row):
                 ["スカート", "有り" if skirt_any else "無し"]]
     if proc == "sewing":
         return [["マジックテープ", velcro_label(row.get("velcro_sides"))],
-                ["ベルクロ種別", VELCRO_JA.get(row.get("velcro_type"), "-")],
+                ["ベルクロ種別", VELCRO_JA.get(row.get("velcro_type"), "-") if row.get("velcro_sides") else "なし"],
                 ["スカート", "有り" if skirt_any else "無し"],
                 ["スカート取付", SKIRT_ATTACH_JA.get(row.get("skirt_attachment"), "なし") if skirt_any else "なし"],
                 ["スカート継ぎ目", ("シームレス" if row.get("skirt_no_seam") else "通常") if skirt_any else "なし"]]
