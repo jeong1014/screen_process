@@ -32,7 +32,7 @@ def find_chrome():
     return which("chrome") or which("chrome.exe") or which("msedge") or which("msedge.exe")
 
 
-def render_label_pdf(barcode: str, out_path: str) -> bool:
+def render_label_pdf(barcode: str, out_path: str, tpl: str = "") -> bool:
     """/label/{barcode} を Chrome でレンダリングして PDF 化する。成功なら True。"""
     chrome = find_chrome()
     if not chrome:
@@ -40,7 +40,10 @@ def render_label_pdf(barcode: str, out_path: str) -> bool:
         return False
 
     # ?print=1 は付けない(画面の window.print() を誘発しないため)。
+    # tpl を渡すと注文ごとに選んだ版(小型など)で描画される。空なら管理画面の既定版。
     url = f"{SERVER_BASE_URL}/label/{barcode}"
+    if tpl:
+        url += f"?tpl={tpl}"
     user_data = tempfile.mkdtemp(prefix="cdi_chrome_")
     cmd = [
         chrome,
@@ -67,9 +70,10 @@ def render_label_pdf(barcode: str, out_path: str) -> bool:
     return True
 
 
-def print_label_via_chrome(barcode: str, printer_key: str) -> bool:
+def print_label_via_chrome(barcode: str, printer_key: str, tpl: str = "") -> bool:
     """バーコード1枚を Chrome で PDF 化 → SumatraPDF で印刷。成功なら True。
 
+    tpl: この注文で使うラベル版のキー(小型など)。画面と同じ版で印刷させる。
     どこかで失敗したら False を返すだけで例外は投げない(呼び出し側がフォールバック)。
     """
     printer_name = get_printer_name(printer_key)
@@ -79,7 +83,7 @@ def print_label_via_chrome(barcode: str, printer_key: str) -> bool:
 
     pdf_path = os.path.join(tempfile.gettempdir(), f"cdi_label_{barcode}.pdf")
     try:
-        if not render_label_pdf(barcode, pdf_path):
+        if not render_label_pdf(barcode, pdf_path, tpl):
             return False
         subprocess.run([SUMATRA_PATH, "-print-to", printer_name,
                         "-print-settings", "noscale", pdf_path],

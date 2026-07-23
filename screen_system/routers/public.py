@@ -141,7 +141,7 @@ def create_order(order: OrderIn):
                 # 1) まず Chrome 経路(=画面 label_gorilla.html と完全一致)で印刷を試みる。
                 #    LABEL_PRINT_ENGINE="chrome" の時だけ。成功したら次の明細へ。
                 if LABEL_PRINT_ENGINE == "chrome" and \
-                        print_label_via_chrome(barcode, label_printer):
+                        print_label_via_chrome(barcode, label_printer, label_tpl):
                     continue
                 # 2) Chrome が無い/失敗した、または weasyprint 指定 → 従来の WeasyPrint 経路。
                 cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))

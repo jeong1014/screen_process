@@ -35,9 +35,12 @@ def get_local_image_b64(filename: str) -> str:
 # ---------------------------------------------------------
 # 1. 재고 QR 라벨 템플릿 (90mm x 29mm)
 # ---------------------------------------------------------
-def render_inventory_label(code, name, serial, unit):
+def render_inventory_label(code, name, serial, unit, issued_at=None):
     qr_b64 = get_base64_qr(serial)
     sub_text = f"{code}" + (f" ({unit})" if unit else "")
+    # 発行日: ラベルは発行(採番)と同時に印刷されるため、未指定なら現在日時=発行日。
+    _dt = issued_at or datetime.datetime.now()
+    date_str = _dt.strftime("%Y/%m/%d")
     
     return f"""
     <!DOCTYPE html>
@@ -62,6 +65,7 @@ def render_inventory_label(code, name, serial, unit):
       .info .sub    {{ font-size: 2.5mm; font-weight: 600; color: #333; letter-spacing: .2mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
       .info .title  {{ font-size: 4.6mm; font-weight: 800; line-height: 1.08; margin: .5mm 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }}
       .info .serial {{ font-size: 5.4mm; font-weight: 900; letter-spacing: .4mm; font-family: "Consolas","Courier New",monospace; }}
+      .info .title .tdate {{ font-weight: 800; margin-left: 3mm; }}
     </style>
     </head>
     <body>
@@ -69,7 +73,7 @@ def render_inventory_label(code, name, serial, unit):
         <div class="qr"><img src="data:image/png;base64,{qr_b64}"></div>
         <div class="info">
           <div class="sub">{sub_text}</div>
-          <div class="title">{name}</div>
+          <div class="title">{name}<span class="tdate">{date_str}</span></div>
           <div class="serial">{serial}</div>
         </div>
       </div>
