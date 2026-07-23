@@ -58,30 +58,48 @@
       position: absolute;
     }
 
-    /* 折り位置の目印(端の短い線だけ。中央は印字しない) */
-    .foldmark {
-      top: 206mm;
-      width: 5mm;
+    /* ① 切り取り線(いちばん上)。図面の切断線のように破線で全幅に引く。左端にハサミ記号。 */
+    .cutline {
+      left: 0;
+      right: 0;
+      top: 6mm;
       height: 0;
-      border-top: 0.3mm solid #000;
+      border-top: 0.35mm dashed #333;
+    }
+    .cutline .scissors {
+      position: absolute;
+      left: 1mm;
+      top: -3mm;
+      font-size: 4mm;
+      line-height: 1;
+      color: #333;
     }
 
-    .foldmark.l { left: 0; }
-    .foldmark.r { right: 0; }
-
-    /* 画面で確認する時だけ折り線を薄く見せる(印刷には出ない) */
-    @media screen {
-      .foldguide {
-        left: 0;
-        right: 0;
-        top: 206mm;
-        height: 0;
-        border-top: 0.2mm dashed #9bb;
-      }
+    /* ⑤ 折り線。図面の「折り」を表す一点鎖線(長線・点・長線)で全幅に引く。 */
+    .foldline {
+      left: 0;
+      right: 0;
+      top: 206mm;
+      height: 0;
+      /* border では一点鎖線が引けないので、細い帯に繰り返しグラデーションで描く */
+      border: 0;
+      height: 0.4mm;
+      background-image: repeating-linear-gradient(
+        to right,
+        #444 0, #444 6mm,          /* 長い線 */
+        transparent 6mm, transparent 8mm,
+        #444 8mm, #444 8.8mm,      /* 点 */
+        transparent 8.8mm, transparent 10.8mm
+      );
     }
-
-    @media print {
-      .foldguide { display: none; }
+    /* 折り位置であることを示す小さなラベル(端に) */
+    .foldline .foldtag {
+      position: absolute;
+      right: 1mm;
+      top: -3.4mm;
+      font-size: 2.6mm;
+      color: #777;
+      letter-spacing: .2mm;
     }
 
     @media screen {
@@ -152,6 +170,31 @@
       margin-top: -2.4mm;
     }
 
+    /* ② 社員バーコード(生地名の右横)。現状は機能未実装のためダミー値。 */
+    .empcode {
+      right: 6mm;
+      top: 26mm;
+      text-align: center;
+    }
+    .empcode .lbl {
+      font-size: 2.6mm;
+      font-weight: 700;
+      color: #333;
+      letter-spacing: .3mm;
+      margin-bottom: 0.8mm;
+    }
+    .empcode svg {
+      width: 34mm;
+      height: 11mm;
+      display: block;
+    }
+    .empcode .num {
+      font-size: 2.6mm;
+      font-weight: 600;
+      letter-spacing: .4mm;
+      margin-top: 0.4mm;
+    }
+
     /* spec table */
     table.spec {
       left: 8.8mm;
@@ -194,8 +237,9 @@
       text-align: center;
     }
 
+    /* ③ 両側 5mm ずつ空ける → 110mm - 10mm = 100mm */
     .barcode-wrap svg {
-      width: 104mm;
+      width: 100mm;
       height: 18.7mm;
       display: block;
       margin: 0 auto;
@@ -217,6 +261,18 @@
       max-width: none;
       height: auto;
       display: block;
+    }
+
+    /* ④ ゴリラマークの下・正中央に、うすい文字(design 行よりさらに薄く) */
+    .subtag {
+      left: 0;
+      right: 0;
+      top: 198mm;
+      text-align: center;
+      font-size: 3.0mm;
+      font-weight: 500;
+      letter-spacing: 1.2mm;
+      color: #c4c4c4;               /* design(#7d7d7d)より薄い */
     }
 
     /* wash care */
@@ -341,11 +397,21 @@
 <body>
   <div id="sheet">
     <div class="label">
+      <!-- ① 切り取り線(いちばん上) -->
+      <div class="cutline"><span class="scissors">&#9986;</span></div>
+
       <div class="perf top" id="perfTop"></div>
 
       <div class="head">
         <div class="code" id="fCode">LN</div>
         <div class="name" id="fName">特殊ダブルレイヤーポリエステル生地</div>
+      </div>
+
+      <!-- ② 社員バーコード(ダミー) -->
+      <div class="empcode">
+        <div class="lbl">社員</div>
+        <svg id="empBarcode"></svg>
+        <div class="num" id="empNum"></div>
       </div>
 
       <table class="spec">
@@ -359,10 +425,11 @@
 
       <img class="gorilla" id="gorilla" alt="ゴリラインパクト スクリーン">
 
-      <!-- 折り位置(224.6mm)の目印 -->
-      <div class="foldmark l"></div>
-      <div class="foldmark r"></div>
-      <div class="foldguide"></div>
+      <!-- ④ ゴリラマーク下・正中央のうすい文字 -->
+      <div class="subtag">GORILLA IMPACT SCREEN</div>
+
+      <!-- ⑤ 折り線(図面の折り表現・一点鎖線) -->
+      <div class="foldline"><span class="foldtag">折り線</span></div>
 
       <!-- ===== ここから裏面(下半分)。180°回転して印刷される ===== -->
       <div class="backside">
@@ -2790,6 +2857,14 @@
         const _bc = q("barcode"); if (_bc) _bc.setAttribute("preserveAspectRatio", "none");
       } catch (e) { console.error("barcode", e); }
       q("barcodeText").textContent = d.barcodeText;
+
+      // ② 社員バーコード(現状ダミー。将来 d.empCode を使う)
+      try {
+        const emp = d.empCode || "EMP-0001";
+        JsBarcode(q("empBarcode"), emp, { format: "CODE128", width: 1.3, height: 34, displayValue: false, margin: 0 });
+        const _eb = q("empBarcode"); if (_eb) _eb.setAttribute("preserveAspectRatio", "none");
+        q("empNum").textContent = emp;
+      } catch (e) { console.error("empBarcode", e); }
 
       try {
         const qr = qrcode(0, "H"); qr.addData(d.qrValue); qr.make();
