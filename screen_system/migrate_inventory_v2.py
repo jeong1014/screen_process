@@ -64,13 +64,10 @@ CREATE INDEX IF NOT EXISTS idx_inv_tx_code ON inv_tx(code);
 
 # (code, category, group_no, group_name, name, fabric_type, flame, unit, sort_order)
 ITEMS = [
-    # 1. 原反 (ロール)
-    ("11", "fabric", 1, "原反", "ダブルレイヤーポリエステル生地",        "DP",  True,  "ロール", 11),
-    ("12", "fabric", 1, "原反", "ダブルレイヤーポリエステル生地(防炎なし)", "DP",  False, "ロール", 12),
-    ("13", "fabric", 1, "原反", "特殊ダブルレイヤーポリエステル生地",      "SDP", True,  "ロール", 13),
-    ("14", "fabric", 1, "原反", "特殊ダブルレイヤーポリエステル生地(防炎なし)", "SDP", False, "ロール", 14),
-    ("15", "fabric", 1, "原反", "低騒音生地",                          "LN",  True,  "ロール", 15),
-    ("16", "fabric", 1, "原反", "低騒音生地(防炎なし)",                 "LN",  False, "ロール", 16),
+    # 1. 原反 (ロール) — 生地は必ず防炎。3種のみ。名称は英略号(ラベル/在庫表示ともに略号で出す)。
+    ("11", "fabric", 1, "原反", "DP",  "DP",  True, "ロール", 11),
+    ("12", "fabric", 1, "原反", "SDP", "SDP", True, "ロール", 12),
+    ("13", "fabric", 1, "原反", "LN",  "LN",  True, "ロール", 13),
     # 2. マジックテープ (箱)
     ("21", "accessory", 2, "マジックテープ", "マジックテープ、HOOK", None, None, "箱", 21),
     ("22", "accessory", 2, "マジックテープ", "マジックテープ、LOOP", None, None, "箱", 22),
@@ -114,8 +111,10 @@ def main():
             cap = {"fabric": 10, "supply": 10}.get(cat, 20)
             reorder = {"fabric": 3, "supply": 2}.get(cat, 5)
             cur.execute(UPSERT, (code, cat, gno, gname, name, ft, flame, unit, cap, reorder, so))
-        # 統合・廃止した品目は無効化(在庫画面/発注から消える。既存QRは残る)
-        cur.execute("UPDATE inv_item SET active=FALSE WHERE code='42'")
+        # ITEMS に無いコード(=統合・廃止した品目)は無効化する。
+        # 在庫画面/発注から消えるだけで、既に発行済みのQR個体(inv_unit)は残る。
+        codes = [it[0] for it in ITEMS]
+        cur.execute("UPDATE inv_item SET active=FALSE WHERE NOT (code = ANY(%s))", (codes,))
         conn.commit()
         cur.execute("SELECT count(*) FROM inv_item")
         n = cur.fetchone()[0]
