@@ -427,8 +427,7 @@
 
       </div>
 
-      <!-- 点線(ミシン目・アイレット)は回転させず、用紙のいちばん下に置く -->
-      <div class="eyelets" id="eyelets"></div>
+      <!-- ミシン目は回転させず、用紙のいちばん下に置く(アイレットの二重丸は削除) -->
       <div class="perf bottom" id="perfBottom"></div>
     </div>
   </div>
@@ -2807,7 +2806,7 @@
       };
     }
 
-    function dots(el, n) { el.innerHTML = ""; for (let i = 0; i < n; i++) el.appendChild(document.createElement("i")); }
+    function dots(el, n) { if (!el) return; el.innerHTML = ""; for (let i = 0; i < n; i++) el.appendChild(document.createElement("i")); }
 
     function render(d, root) {
       const q = id => root.querySelector("#" + id);
