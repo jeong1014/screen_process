@@ -418,7 +418,7 @@
         setSubmitting(true);
         try {
           const body = {
-            channel: 'self',
+            channel: 'base_ec',   // 自社ショップ(BASE)。DBの sales_channel enum に合わせる('self' は不正値)
             customer_name: custName.trim(),
             phone: custPhone.trim(),
             postal_code: custPostal.trim(),
