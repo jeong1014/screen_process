@@ -92,15 +92,6 @@
         transparent 8.8mm, transparent 10.8mm
       );
     }
-    /* 折り位置であることを示す小さなラベル(端に) */
-    .foldline .foldtag {
-      position: absolute;
-      right: 1mm;
-      top: -3.4mm;
-      font-size: 2.6mm;
-      color: #777;
-      letter-spacing: .2mm;
-    }
 
     @media screen {
       body {
@@ -173,26 +164,13 @@
     /* ② 社員バーコード(生地名の右横)。現状は機能未実装のためダミー値。 */
     .empcode {
       right: 6mm;
-      top: 26mm;
+      top: 30mm;
       text-align: center;
-    }
-    .empcode .lbl {
-      font-size: 2.6mm;
-      font-weight: 700;
-      color: #333;
-      letter-spacing: .3mm;
-      margin-bottom: 0.8mm;
     }
     .empcode svg {
       width: 34mm;
-      height: 11mm;
+      height: 12mm;
       display: block;
-    }
-    .empcode .num {
-      font-size: 2.6mm;
-      font-weight: 600;
-      letter-spacing: .4mm;
-      margin-top: 0.4mm;
     }
 
     /* spec table */
@@ -407,11 +385,9 @@
         <div class="name" id="fName">特殊ダブルレイヤーポリエステル生地</div>
       </div>
 
-      <!-- ② 社員バーコード(ダミー) -->
+      <!-- ② 社員バーコード(ダミー・バーコードのみ) -->
       <div class="empcode">
-        <div class="lbl">社員</div>
         <svg id="empBarcode"></svg>
-        <div class="num" id="empNum"></div>
       </div>
 
       <table class="spec">
@@ -425,11 +401,11 @@
 
       <img class="gorilla" id="gorilla" alt="ゴリラインパクト スクリーン">
 
-      <!-- ④ ゴリラマーク下・正中央のうすい文字 -->
-      <div class="subtag">GORILLA IMPACT SCREEN</div>
+      <!-- ④ ゴリラマーク下・正中央のうすい文字(著作権表示) -->
+      <div class="subtag">&copy; Copyright CDI of JAPAN</div>
 
       <!-- ⑤ 折り線(図面の折り表現・一点鎖線) -->
-      <div class="foldline"><span class="foldtag">折り線</span></div>
+      <div class="foldline"></div>
 
       <!-- ===== ここから裏面(下半分)。180°回転して印刷される ===== -->
       <div class="backside">
@@ -2863,7 +2839,6 @@
         const emp = d.empCode || "EMP-0001";
         JsBarcode(q("empBarcode"), emp, { format: "CODE128", width: 1.3, height: 34, displayValue: false, margin: 0 });
         const _eb = q("empBarcode"); if (_eb) _eb.setAttribute("preserveAspectRatio", "none");
-        q("empNum").textContent = emp;
       } catch (e) { console.error("empBarcode", e); }
 
       try {
