@@ -17,6 +17,26 @@ PRINTER_CONFIG_PATH = os.path.join(BASE_DIR, "printer_config.json")
 SCANNER_CONFIG_PATH = os.path.join(BASE_DIR, "scanner_config.json")
 SUMATRA_PATH = os.path.join(BASE_DIR, "SumatraPDF.exe")
 
+# ===== ラベル自動印刷のエンジン =====
+#   "chrome"    … label_gorilla.html を Chrome(ヘッドレス)で PDF 化して印刷。
+#                 画面(手動印刷)と全く同じ見た目になる。Chrome が無ければ自動で
+#                 weasyprint にフォールバックするので、ラベルが出ないことはない。
+#   "weasyprint"… 従来どおり print_templates.py を WeasyPrint で PDF 化。
+#   問題が出たら下を "weasyprint" にすれば即座に元の挙動へ戻せる。
+LABEL_PRINT_ENGINE = os.environ.get("LABEL_PRINT_ENGINE", "chrome")
+
+# 自動印刷はサーバー自身の /label ページを Chrome で開いて刷る。そのための自分宛URL。
+# uvicorn を別ポートで動かす場合は環境変数 SERVER_BASE_URL で上書きする。
+SERVER_BASE_URL = os.environ.get("SERVER_BASE_URL", "http://127.0.0.1:8000")
+
+# Chrome / Edge の実行ファイル候補(Windows)。最初に見つかったものを使う。
+CHROME_CANDIDATES = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+]
+
 # 進行状態 stage の最大値 (0=受付 … 6=ハトメ完了)
 MAX_STAGE = 6
 

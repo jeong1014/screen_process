@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 
 from config import (
     MAX_STAGE, PROC_BY_STAGE, SHEET_SIDE_JA, _PRODUCT_JP, MON_PROC,
-    VELCRO_JA, SKIRT_ATTACH_JA,
+    VELCRO_JA, SKIRT_ATTACH_JA, LABEL_PRINT_ENGINE,
 )
 from db import db
 from schemas import (
@@ -25,6 +25,7 @@ from services.stage import (
     next_order_no, _fetch_item, get_item_payload, move_stage, monitor_scan,
 )
 from services.inventory import inv_scan
+from services.browser_print import print_label_via_chrome
 from services.labels import (
     printer_key as label_printer_key, resolve as resolve_label,
     listing as label_template_listing,
@@ -137,10 +138,14 @@ def create_order(order: OrderIn):
         # 各明細ごとに try/except で囲む。失敗はサーバーログに残す。
         for barcode in created:
             try:
-                # DB에서 저장된 항목 데이터를 다시 불러와서 넘김
+                # 1) まず Chrome 経路(=画面 label_gorilla.html と完全一致)で印刷を試みる。
+                #    LABEL_PRINT_ENGINE="chrome" の時だけ。成功したら次の明細へ。
+                if LABEL_PRINT_ENGINE == "chrome" and \
+                        print_label_via_chrome(barcode, label_printer):
+                    continue
+                # 2) Chrome が無い/失敗した、または weasyprint 指定 → 従来の WeasyPrint 経路。
                 cur.execute("SELECT * FROM order_items WHERE barcode=%s", (barcode,))
                 item_row = cur.fetchone()
-                # worker_payload(기존 함수)를 이용해 템플릿에 들어갈 데이터 포맷팅
                 item_data = worker_payload(item_row)
                 html_content = render_order_label(item_data)
                 silent_print_html(html_content, label_printer)
